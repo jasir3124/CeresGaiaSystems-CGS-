@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { isFieldManagement, isSoilTest, type FieldManagement, type SoilTest } from './agronomy';
 import type { Coordinates, OverviewData, WeatherData } from './types';
-import { isCropHistory, type CropHistory } from './crops';
+import { isCropHistory, normalizeCropHistory, sortCropHistory, type CropHistory } from './crops';
 
 export interface SavedField {
   id: string;
@@ -15,6 +16,8 @@ export interface SavedField {
   savedAt: string;
   updatedAt: string;
   cropHistory?: CropHistory;
+  soilTests?: SoilTest[];
+  management?: FieldManagement;
 }
 
 type Snapshot = { nasa?: OverviewData | null; weather?: WeatherData | null };
@@ -23,8 +26,9 @@ type FieldsContextType = {
   activeFieldId: string | null;
   hydrated: boolean;
   setActiveFieldId: (id: string | null) => void;
-  saveField: (value: Omit<SavedField, 'id' | 'savedAt' | 'updatedAt' | 'cropHistory'>, existingId?: string | null) => SavedField | null;
+  saveField: (value: Omit<SavedField, 'id' | 'savedAt' | 'updatedAt' | 'cropHistory' | 'soilTests' | 'management'>, existingId?: string | null) => SavedField | null;
   saveFieldCrops: (id: string, crops: CropHistory) => boolean;
+  saveFieldAgronomy: (id: string, soilTests: SoilTest[], management: FieldManagement) => boolean;
   updateFieldSnapshot: (id: string, snapshot: Snapshot) => void;
   deleteField: (id: string) => void;
 };
@@ -51,7 +55,9 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       if (Array.isArray(parsed)) setFields(parsed.filter(isField).slice(0, 100).map(field => ({
-        ...field, cropHistory: isCropHistory(field.cropHistory) ? field.cropHistory : undefined
+        ...field, cropHistory: normalizeCropHistory(field.cropHistory),
+        soilTests: Array.isArray(field.soilTests) ? field.soilTests.filter(isSoilTest) : [],
+        management: isFieldManagement(field.management) ? field.management : undefined
       })));
       setActiveFieldIdState(localStorage.getItem(ACTIVE_KEY));
     } catch (error) { console.warn('Could not read saved fields', error); }
@@ -83,6 +89,8 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       const result: SavedField = {
         ...field,
         cropHistory: existing?.cropHistory,
+        soilTests: existing?.soilTests,
+        management: existing?.management,
         id: existing?.id || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `field-${Date.now()}-${Math.random().toString(36).slice(2)}`),
         savedAt: existing?.savedAt ?? now,
         updatedAt: now
@@ -102,8 +110,12 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
     },
     saveFieldCrops: (id, crops) => {
       if (!hydrated || !isCropHistory(crops) || !fields.some(field => field.id === id)) return false;
+      const existing = fields.find(field => field.id === id)!;
+      // Only migrated records may retain an unknown date; every new planting needs one.
+      if (crops.some(crop => crop.plantedOn === null && !existing.cropHistory?.some(previous =>
+        previous.id === crop.id && previous.cropId === crop.cropId && previous.plantedOn === null))) return false;
       const next = fields.map(field => field.id === id ? {
-        ...field, cropHistory: [...crops] as CropHistory, updatedAt: new Date().toISOString()
+        ...field, cropHistory: sortCropHistory(crops.map(crop => ({ ...crop }))), updatedAt: new Date().toISOString()
       } : field);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -111,6 +123,16 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
         console.warn('Could not save crop history', error);
         return false;
       }
+      setFields(next);
+      return true;
+    },
+    saveFieldAgronomy: (id, soilTests, management) => {
+      const existing = fields.find(field => field.id === id);
+      if (!hydrated || !existing || !Array.isArray(soilTests) || !soilTests.every(isSoilTest) || !isFieldManagement(management) ||
+        (management.currentCropId !== null && !existing.cropHistory?.some(record => record.id === management.currentCropId && record.plantedOn && record.plantedOn <= new Date().toISOString().slice(0, 10)))) return false;
+      const next = fields.map(field => field.id === id ? { ...field, soilTests, management, updatedAt: new Date().toISOString() } : field);
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
+      catch { return false; }
       setFields(next);
       return true;
     },

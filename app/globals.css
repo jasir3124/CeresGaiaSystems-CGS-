@@ -25,3 +25,24 @@ button:focus-visible, input:focus-visible { outline: 3px solid #97c4a4; outline-
 .switch[data-on='true']::after { transform: translateX(15px); }
 input[type='range'] { accent-color: #236449; }
 @media (max-width: 720px) { body { overflow: hidden; } .maplibregl-ctrl-bottom-right { bottom: 0; } }
+
+/* Shared rail dimensions keep map controls clear of the larger navigation. */
+:root { --sidebar-width: 80px; --map-panel-width: calc(100vw - var(--sidebar-width) - 28px); }
+@media (min-width: 768px) { :root { --sidebar-width: 96px; } }
+.suggestions-panel { font-size: 14px; line-height: 1.6; }
+.suggestions-panel summary { list-style-position: outside; margin-left: 1rem; }
+.suggestions-panel h2 { letter-spacing: -.035em; }
+.crop-group-best > div > h3 { color: #326443; }
+.crop-group-moderate > div > h3 { color: #936b24; }
+.crop-group-poor > div > h3 { color: #9a5144; }
+.crop-group-moderate .crop-suggestion-card { background: #f7f5ed; }
+.crop-group-moderate .crop-score { background: #eee6cc; color: #82631f; }
+.crop-group-poor .crop-suggestion-card { background: #faf2ef; }
+.crop-group-poor .crop-score { background: #f0ded7; color: #954f3d; }
+.crop-group-unknown .crop-suggestion-card { background: #f1f3f0; }
+.crop-suggestion-card:has(.crop-card-details[open]) { grid-column: 1 / -1; }
+.suggestions-panel th { white-space: nowrap; }
+@media (max-height: 650px) {
+  nav[aria-label='Primary navigation'] > div:nth-child(2) { margin-top: 12px; gap: 4px; }
+  nav[aria-label='Primary navigation'] > div:nth-child(2) > button { min-height: 56px; height: 56px; }
+}

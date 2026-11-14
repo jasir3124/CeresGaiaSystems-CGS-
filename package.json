@@ -1,5 +1,5 @@
 {
-  "name": "fieldshift-v2",
+  "name": "cgs",
   "version": "2.0.0",
   "private": true,
   "scripts": {
@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test:recommendations": "node --test tests/recommendations.test.mjs",
     "test:geo": "node --test tests/geo.test.mjs"
   },
   "dependencies": {

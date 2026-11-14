@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
-import { Sprout, Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { MessageCircle, Sprout, Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
 import FieldOverview from './FieldOverview';
+import FieldChat from './FieldChat';
 import CropsModal from './CropsModal';
+import Recommendations from './Recommendations';
 import { BASE_STYLES, DATA_LAYERS, LAYER_IDS } from '@/lib/layers';
 import type { Coordinates, LayerId, LayerManifest, LayerStatus, MapStyleId, OverviewData, WeatherData } from '@/lib/types';
 import { useFields } from '@/lib/field-store';
@@ -44,6 +46,8 @@ export default function FieldShiftApp() {
   const { fields, activeFieldId, hydrated, setActiveFieldId, saveField, updateFieldSnapshot, deleteField } = useFields();
   const [savedFieldsOpen, setSavedFieldsOpen] = useState(false);
   const [cropsOpen, setCropsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [recommendationsOpen, setRecommendationsOpen] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -228,26 +232,32 @@ export default function FieldShiftApp() {
     {HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
 
     {/* Account-free saved fields and crop histories, persisted locally. */}
-    <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[58px] flex-col items-center border-r border-[#ebefeb] bg-white/95 px-1 py-3 shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[64px]">
-      <div className="group flex flex-col items-center gap-1" title="FieldShift">
-        <div className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#225c44] text-white"><Leaf size={19} strokeWidth={1.8}/></div>
-        <span className="text-[8.5px] font-extrabold tracking-[-.04em] text-[#275641]">FieldShift</span>
+    <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[80px] flex-col items-center border-r border-[#ebefeb] bg-white/95 px-2 py-4 overflow-y-auto shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[96px]">
+      <div className="group flex flex-col items-center gap-1" title="CGS — CeresGaiaSystems">
+        <div className="grid h-11 w-11 place-items-center rounded-[10px] bg-[#225c44] text-white"><Leaf size={23} strokeWidth={1.8}/></div>
+        <span className="text-sm font-extrabold tracking-[-.04em] text-[#275641]">CGS</span>
       </div>
-      <div className="mt-7 flex w-full flex-col items-center gap-2">
-        <button onClick={() => { setSavedFieldsOpen(false); setCropsOpen(false); setHelpOpen(false); setShowOverview(true); }} className="flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl bg-[#eef5ee] text-[#286048]" title="Explore" aria-current="page"><Map size={17}/><span className="text-[9px] font-semibold">Explore</span></button>
-        <button onClick={() => { setSavedFieldsOpen(v => !v); setCropsOpen(false); setHelpOpen(false); }} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={17}/><span className="text-[9px]">Fields</span></button>
-        <button onClick={() => { setCropsOpen(true); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${cropsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Crops" aria-haspopup="dialog" aria-expanded={cropsOpen}><Sprout size={17}/><span className="text-[9px]">Crops</span></button>
+      <div className="mt-5 flex w-full flex-col items-center gap-2">
+        <button onClick={() => { setSavedFieldsOpen(false); setCropsOpen(false); setHelpOpen(false); setRecommendationsOpen(false); setChatOpen(false); setShowOverview(true); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#758478] hover:bg-[#f7faf6]'}`} title="Explore" aria-current={!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'page' : undefined}><Map size={22}/><span className="text-xs font-semibold">Explore</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setSavedFieldsOpen(v => !v); setCropsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={22}/><span className="text-xs">Fields</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setCropsOpen(true); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${cropsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Crops" aria-haspopup="dialog" aria-expanded={cropsOpen}><Sprout size={22}/><span className="text-xs">Crops</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(true); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${chatOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="AI field assistant" aria-expanded={chatOpen}><MessageCircle size={22}/><span className="text-xs">AI Chat</span></button>
+        <button onClick={() => { setRecommendationsOpen(true); setChatOpen(false); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${recommendationsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Suggestions" aria-expanded={recommendationsOpen}><Sparkles size={22}/><span className="text-[11px] font-semibold">Suggestions</span></button>
       </div>
       <div className="mt-auto flex flex-col items-center gap-2 pb-1">
-        <button onClick={() => { setHelpOpen(v => !v); setSavedFieldsOpen(false); setCropsOpen(false); }} aria-label="How to use FieldShift" className="grid h-9 w-9 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={19}/></button>
-        <span className="text-[9px] text-[#9cab9f]">Help</span>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setHelpOpen(v => !v); setSavedFieldsOpen(false); setCropsOpen(false); }} aria-label="How to use CGS" className="grid h-11 w-11 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={23}/></button>
+        <span className="text-xs text-[#9cab9f]">Help</span>
       </div>
     </nav>
 
+    <Recommendations open={recommendationsOpen} onClose={() => setRecommendationsOpen(false)}/>
+    <FieldChat key={`${activeFieldId ?? 'map'}:${selection?.join(',') ?? 'none'}`} open={chatOpen}
+      field={selection ? { name: activeSavedField?.name ?? placeLabel ?? 'Selected map location', point: selection, radius, cropHistory: activeSavedField?.cropHistory ?? [] } : null}
+      fields={fields} activeFieldId={activeFieldId} onSelectField={loadField} onClose={() => setChatOpen(false)}/>
     {cropsOpen && <CropsModal onClose={() => setCropsOpen(false)}/>}
 
     {/* Place search and dataset pills */}
-    <header className="pointer-events-none absolute left-[68px] right-3 top-3 z-20 md:left-[78px] md:right-5 md:top-4">
+    <header className="pointer-events-none absolute left-[calc(var(--sidebar-width)+14px)] right-3 top-3 z-20 md:left-[calc(var(--sidebar-width)+14px)] md:right-5 md:top-4">
       <div className="flex w-full items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-2 sm:flex-initial">
           <div className="pointer-events-auto relative w-full sm:w-[310px] md:w-[345px]">
@@ -267,7 +277,7 @@ export default function FieldShiftApp() {
         </div>
         <div className="pointer-events-auto hidden shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-soft lg:flex">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef4ea] text-[#447953]"><Sun size={17}/></span>
-          <span><span className="block text-[11px] font-bold text-[#344d3d]">NASA Earth Explorer</span><span className="block text-[9px] text-[#8fa092]">Observed data Â· not a live forecast</span></span>
+          <span><span className="block text-[11px] font-bold text-[#344d3d]">CGS Earth Explorer</span><span className="block text-[9px] text-[#8fa092]">Observed data Â· not a live forecast</span></span>
         </div>
       </div>
       <div className="pointer-events-auto soft-scroll mt-2.5 flex max-w-[730px] gap-1.5 overflow-x-auto pb-1">
@@ -283,13 +293,12 @@ export default function FieldShiftApp() {
       </div>
     </header>
 
-    {selection && showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && <aside className="absolute bottom-[76px] left-[69px] top-[131px] z-10 w-[min(329px,calc(100vw-84px))] md:bottom-[76px] md:left-[79px] md:top-[127px] md:w-[335px]">
+    {selection && showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && !chatOpen && !recommendationsOpen && <aside className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[131px] z-10 w-[min(329px,var(--map-panel-width))] md:bottom-[76px] md:left-[calc(var(--sidebar-width)+14px)] md:top-[127px] md:w-[335px]">
       <FieldOverview selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} weather={weather} weatherLoading={weatherLoading} weatherError={weatherError} weatherNotConfigured={weatherNotConfigured} placeLabel={placeLabel} preview={preview}/>
     </aside>}
 
-    {selection && !showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && <button onClick={() => setShowOverview(true)} className="absolute left-[78px] top-[136px] z-10 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[11px] font-semibold text-[#286048] shadow-float"><ChevronRight size={16}/> View area overview</button>}
 
-    {savedFieldsOpen && <div className="absolute bottom-[76px] left-[69px] top-[133px] z-20 w-[min(316px,calc(100vw-84px))] overflow-y-auto rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:left-[79px]">
+    {savedFieldsOpen && <div className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[133px] z-20 w-[min(316px,var(--map-panel-width))] overflow-y-auto rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
       <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-[#2b5038]">Saved fields</h3><button onClick={() => setSavedFieldsOpen(false)} aria-label="Close saved fields" className="text-[#869a8c]"><X size={17}/></button></div>
       <p className="mt-1 text-[10px] text-[#93a297]">Stored on this device Â· {fields.length} fields</p>
       {fields.length === 0 && <p className="mt-4 rounded-xl bg-[#f4f8f3] p-3 text-[11px] leading-relaxed text-[#7c8e80]">Select an area and use Save field in the overview. It will stay here even after you close the browser.</p>}
@@ -306,7 +315,7 @@ export default function FieldShiftApp() {
     </div>}
 
     {/* Satellite / terrain / dark base-map selection */}
-    <div className="absolute bottom-5 left-[70px] z-10 md:bottom-6 md:left-[80px]">
+    <div className="absolute bottom-5 left-[calc(var(--sidebar-width)+14px)] z-10 md:bottom-6 md:left-[calc(var(--sidebar-width)+14px)]">
       {stylePickerOpen && <div className="mb-2 grid w-[244px] grid-cols-2 gap-2 rounded-xl bg-white p-2 shadow-float">
         {(Object.entries(BASE_STYLES) as [MapStyleId, typeof BASE_STYLES[MapStyleId]][]).map(([id, item]) => <button key={id} onClick={() => { setStyleId(id); setStylePickerOpen(false); }} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold ${id === styleId ? 'bg-[#eaf4eb] text-[#205b43]' : 'hover:bg-[#f6f8f5]'}`}>
           <span className={`h-7 w-7 shrink-0 rounded-md border border-black/10 ${id === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : id === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : id === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />{item.name}
@@ -331,7 +340,7 @@ export default function FieldShiftApp() {
       </div>
     </div>
 
-    {layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,calc(100vw-85px))] rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:right-6 md:top-[355px]">
+    {layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,var(--map-panel-width))] rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:right-6 md:top-[355px]">
       <div className="flex items-start justify-between gap-2"><div><h3 className="text-[13px] font-bold">NASA map layers</h3><p className="mt-0.5 text-[10px] text-[#91a195]">Satellite & model visualizations</p></div><button onClick={() => setLayersPanelOpen(false)} className="text-[#91a195]"><X size={16}/></button></div>
       <div className="mt-3 space-y-1">{LAYER_IDS.map(id => {
         const status = statuses.find(s => s.id === id);
@@ -344,9 +353,9 @@ export default function FieldShiftApp() {
       <p className="mt-3 border-t border-[#e9efea] pt-3 text-[10px] leading-relaxed text-[#859488]">One NASA map layer at a time. Wind imagery is historical; current forecast values appear in the Meteomatics overview.</p>
     </div>}
 
-    {helpOpen && <div className="absolute bottom-6 left-[70px] z-30 w-[min(325px,calc(100vw-85px))] rounded-card bg-white p-5 shadow-float md:left-[80px]">
+    {helpOpen && <div className="absolute bottom-6 left-[calc(var(--sidebar-width)+14px)] z-30 w-[min(325px,var(--map-panel-width))] rounded-card bg-white p-5 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
       <button onClick={() => setHelpOpen(false)} aria-label="Close help" className="absolute right-3 top-3 text-[#92a095]"><X size={17}/></button>
-      <h3 className="text-[15px] font-bold">How FieldShift works</h3>
+      <h3 className="text-[15px] font-bold">How CGS works</h3>
       <ol className="mt-3 list-inside list-decimal space-y-2 text-[11px] leading-relaxed text-[#697f70]">
         <li>Click the map or search for a place.</li><li>Drag the green pin to adjust the center.</li><li>Change the radius to grow or shrink the selected area.</li><li>Use one NASA layer at a time.</li><li>Save the field locally to reuse it later.</li>
       </ol>

@@ -1,0 +1,206 @@
+{
+  "wheat": {
+    "nitrogen": "high",
+    "phosphorus": "moderate",
+    "potassium": "moderate",
+    "secondary": [
+      "Sulfur supports protein formation; test before applying."
+    ],
+    "micronutrients": [
+      "Check zinc and iron if local tests or symptoms indicate a problem."
+    ],
+    "organicMatter": "Retain residues where practical; no universal organic matter target.",
+    "salinityThresholdEce": 6,
+    "waterMm": {
+      "min": 450,
+      "max": 650
+    },
+    "kcMid": 1.15,
+    "nutrientNotes": [
+      "Excess nitrogen can increase lodging risk; rates require yield goals and soil tests."
+    ],
+    "residue": "Cereal residues can return carbon when retained; nutrient removal rises if straw is exported.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
+    ],
+    "droughtSensitivity": "low-medium"
+  },
+  "maize": {
+    "nitrogen": "high",
+    "phosphorus": "moderate",
+    "potassium": "high",
+    "secondary": [
+      "Check sulfur on low organic matter or sandy soils."
+    ],
+    "micronutrients": [
+      "Zinc deficiency can limit maize; use a local lab interpretation."
+    ],
+    "organicMatter": "Residue retention can contribute carbon; no universal target.",
+    "salinityThresholdEce": 1.7,
+    "waterMm": {
+      "min": 500,
+      "max": 800
+    },
+    "kcMid": 1.15,
+    "nutrientNotes": [
+      "Nitrogen and potassium supply need testing; silage exports more biomass than grain alone."
+    ],
+    "residue": "Retained stalks can support organic matter; silage harvest removes most above-ground residue.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
+    ],
+    "droughtSensitivity": "medium-high"
+  },
+  "barley": {
+    "nitrogen": "moderate",
+    "phosphorus": "moderate",
+    "potassium": "moderate",
+    "secondary": [
+      "Sulfur supply and nitrogen management affect grain quality."
+    ],
+    "micronutrients": [
+      "Use local tissue/soil tests to assess micronutrient needs."
+    ],
+    "organicMatter": "Retain straw if compatible with management; no universal target.",
+    "salinityThresholdEce": 8,
+    "waterMm": {
+      "min": 450,
+      "max": 650
+    },
+    "kcMid": 1.15,
+    "nutrientNotes": [
+      "Nitrogen needs depend on feed versus malting use; excess can harm quality."
+    ],
+    "residue": "Straw retention adds carbon; it does not establish a measured nutrient credit.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
+    ],
+    "droughtSensitivity": "low-medium"
+  },
+  "soybean": {
+    "nitrogen": "fixing",
+    "phosphorus": "moderate",
+    "potassium": "high",
+    "secondary": [
+      "Calcium, magnesium and sulfur need local soil-test interpretation."
+    ],
+    "micronutrients": [
+      "Iron chlorosis can occur on calcareous soils; avoid blanket micronutrient treatments."
+    ],
+    "organicMatter": "Manage residues and cover crops; no universal organic matter target.",
+    "salinityThresholdEce": 5,
+    "waterMm": {
+      "min": 450,
+      "max": 700
+    },
+    "kcMid": 1.1,
+    "nutrientNotes": [
+      "Effective nodulation can supply nitrogen, but harvested beans remove substantial N. A net soil N gain is not guaranteed.",
+      "Fixation does not replace phosphorus or potassium removed at harvest."
+    ],
+    "residue": "A legume changes the rotation; account for grain export before assuming a nitrogen credit.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops/soybean-fertilizer-guidelines"
+    ],
+    "droughtSensitivity": "low-medium"
+  },
+  "sunflower": {
+    "nitrogen": "moderate",
+    "phosphorus": "moderate",
+    "potassium": "high",
+    "secondary": [
+      "Sulfur risk is greater in low organic matter sandy soils."
+    ],
+    "micronutrients": [
+      "Do not apply boron in contact with seed; confirm deficiency before treatment."
+    ],
+    "organicMatter": "Assess organic matter together with texture and sulfur tests.",
+    "salinityThresholdEce": 4.8,
+    "waterMm": {
+      "min": 600,
+      "max": 1000
+    },
+    "kcMid": 1.1,
+    "nutrientNotes": [
+      "Rooting depth does not make water or nutrients unlimited; test P, K and N."
+    ],
+    "residue": "Residues can contribute carbon if retained; assess broadleaf disease carryover.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
+      "https://extension.umn.edu/nutrient-management/sunflower-fertilizer-guidelines"
+    ],
+    "droughtSensitivity": "low-medium"
+  },
+  "potato": {
+    "nitrogen": "high",
+    "phosphorus": "high",
+    "potassium": "high",
+    "secondary": [
+      "Calcium, magnesium and sulfur should be assessed using local soil/tissue tests."
+    ],
+    "micronutrients": [
+      "Iron, zinc and boron require diagnosis; avoid untested applications."
+    ],
+    "organicMatter": "Organic matter can improve water holding; management must consider tuber disease risk.",
+    "salinityThresholdEce": 1.7,
+    "waterMm": {
+      "min": 500,
+      "max": 700
+    },
+    "kcMid": 1.15,
+    "nutrientNotes": [
+      "A relatively shallow root system and high nutrient demand make soil and tissue testing important.",
+      "Excess nitrogen can delay maturity; tuber removal exports nutrients."
+    ],
+    "residue": "Disturbance and tuber export make cover crops and erosion protection important.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
+      "https://blog-crop-news.extension.umn.edu/2023/10/potato-nutrient-management-research-5.html"
+    ],
+    "droughtSensitivity": "high"
+  },
+  "tomato": {
+    "nitrogen": "high",
+    "phosphorus": "moderate",
+    "potassium": "high",
+    "secondary": [
+      "Calcium supply and steady water uptake matter for fruit quality.",
+      "Check magnesium where the soil test indicates a shortage."
+    ],
+    "micronutrients": [
+      "Iron, zinc and boron applications need local diagnosis."
+    ],
+    "organicMatter": "Compost or green manure can help soil condition; test nutrient content.",
+    "salinityThresholdEce": 2.5,
+    "waterMm": {
+      "min": 400,
+      "max": 800
+    },
+    "kcMid": 1.15,
+    "nutrientNotes": [
+      "Use soil tests for P, K, Ca and Mg; too much nitrogen can promote vegetation over fruit.",
+      "Uneven water uptake can cause calcium-related fruit disorders even when soil calcium is adequate."
+    ],
+    "residue": "Use non-solanaceous breaks and manage infected residues.",
+    "sources": [
+      "https://www.fao.org/4/S2022E/s2022e07.htm",
+      "https://www.fao.org/4/y4263e/y4263e0e.htm",
+      "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
+      "https://extension.missouri.edu/publications/g6370"
+    ],
+    "droughtSensitivity": "medium-high"
+  }
+}

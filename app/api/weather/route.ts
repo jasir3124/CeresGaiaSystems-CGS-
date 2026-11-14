@@ -32,8 +32,8 @@ export async function GET(request: NextRequest) {
   const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
   const start = new Date(hour).toISOString().replace('.000', '');
   const end = new Date(hour + 24 * 3_600_000).toISOString().replace('.000', '');
-  // ~1 km location buckets avoid spending queries when users move a pin a few metres.
-  const loc = `${(Math.round(latitude * 100) / 100).toFixed(2)},${(Math.round(longitude * 100) / 100).toFixed(2)}`;
+  // Query the actual selected field location; Meteomatics resolves its model grid.
+  const loc = `${latitude},${longitude}`;
   const url = `https://api.meteomatics.com/${start}--${end}:PT3H/${PARAMETERS.join(',')}/${loc}/json?model=mix`;
   try {
     const response = await fetch(url, {
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const parsed = await response.json() as MeteoResponse;
     const forecast = parseForecast(parsed);
     if (!forecast.length) throw new Error('Meteomatics did not return weather values for this location.');
-    const result: WeatherData = { source: 'Meteomatics', generatedAt: new Date().toISOString(), point: [longitude, latitude], forecast };
+    const result: WeatherData = { source: 'Meteomatics', generatedAt: response.headers.get('date') && Number.isFinite(Date.parse(response.headers.get('date')!)) ? new Date(response.headers.get('date')!).toISOString() : new Date().toISOString(), point: [longitude, latitude], forecast };
     return NextResponse.json(result, { headers: { 'Cache-Control': 'private, max-age=0' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Meteomatics temporarily unavailable.' }, { status: 502 });

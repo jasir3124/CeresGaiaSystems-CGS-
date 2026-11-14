@@ -41,9 +41,11 @@ export default function MapCanvas({ maptilerKey, selection, radius, styleId, ena
       zoom: 15.5,
       pitch: 0,
       bearing: 0,
-      antialias: true,
       attributionControl: false,
-      preserveDrawingBuffer: false
+      canvasContextAttributes: {
+        antialias: true,
+        preserveDrawingBuffer: false
+      }
     });
     mapRef.current = map;
     map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
@@ -65,7 +67,7 @@ export default function MapCanvas({ maptilerKey, selection, radius, styleId, ena
     });
     map.on('error', event => {
       // Missing/expired/blocked keys become obvious in DevTools instead of a blank map.
-      console.error('[FieldShift] MapTiler/MapLibre error:', event.error);
+      console.error('[CGS] MapTiler/MapLibre error:', event.error);
     });
     map.on('load', () => onReadyRef.current?.(map));
     const onResize = () => map.resize();

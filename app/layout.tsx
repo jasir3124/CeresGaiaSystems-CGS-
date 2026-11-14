@@ -4,8 +4,8 @@ import "./globals.css";
 import { FieldsProvider } from "@/lib/field-store";
 
 export const metadata: Metadata = {
-  title: "FieldShift | Explore with NASA",
-  description: "Explore a location using NASA Earth observation data. No sign-in required."
+  title: "CGS | CeresGaiaSystems",
+  description: "CGS (CeresGaiaSystems) helps you explore fields, crops, weather, and NASA Earth observation data. No sign-in required."
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

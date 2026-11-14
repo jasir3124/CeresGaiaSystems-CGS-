@@ -57,11 +57,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'A valid latitude and longitude are required.' }, { status: 400 });
   }
 
-  // POWER data are gridded, not field-scale. Snap requests to NASA's coarse
-  // ~0.5° grid to avoid repeated identical-cell calls when users move a pin
-  // a few meters. The original pin coordinates remain in the response.
-  const sampledLatitude = Math.round(latitude * 2) / 2;
-  const sampledLongitude = Math.round(longitude * 2) / 2;
+  // Submit the actual requested location. POWER still returns coarse regional
+  // modeled values rather than a field-scale sensor measurement.
+  const sampledLatitude = latitude;
+  const sampledLongitude = longitude;
 
   // Real NASA observations, not a weather forecast. Request a long enough period
   // for data processing delays, then choose the most recent *actually present* day.
@@ -69,6 +68,8 @@ export async function GET(request: NextRequest) {
   const start = ymd(new Date(Date.now() - DAY * 95));
   try {
     const agPromise = loadPower(sampledLatitude, sampledLongitude, start, end, 'AG', AG_PARAMS);
+    // Hydrology can take longer; attach a rejection handler immediately.
+    void agPromise.catch(() => {});
     // Hydrology data can lag meteorology. Query a longer period, and retry with
     // NASA POWER's distinct volumetric surface-moisture series if wetness is absent.
     const hyStart = ymd(new Date(Date.now() - DAY * 370));

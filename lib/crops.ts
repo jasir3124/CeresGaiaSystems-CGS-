@@ -1,5 +1,28 @@
 export type CropId = 'wheat' | 'maize' | 'barley' | 'soybean' | 'sunflower' | 'potato' | 'tomato';
-export type CropHistory = [CropId, CropId, CropId]; // Most recent first; repeated crops are valid.
+export interface CropRecord {
+  id: string;
+  cropId: CropId;
+  plantedOn: string | null; // YYYY-MM-DD; null only for legacy records without a known date.
+}
+export type CropHistory = CropRecord[];
+
+export function isPlantingDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export function sortCropHistory(history: CropHistory): CropHistory {
+  return [...history].sort((a, b) => (b.plantedOn ?? '').localeCompare(a.plantedOn ?? ''));
+}
+
+export function normalizeCropHistory(value: unknown): CropHistory | undefined {
+  if (isCropHistory(value)) return sortCropHistory(value);
+  if (Array.isArray(value) && value.length === 3 && value.every(id => CROPS.some(crop => crop.id === id))) {
+    return value.map((cropId, index) => ({ id: `legacy-${index}`, cropId, plantedOn: null }));
+  }
+  return undefined;
+}
 export interface CropRange { min: number; max: number }
 export interface CropDefinition {
   id: CropId;
@@ -28,8 +51,11 @@ export const CROPS: readonly CropDefinition[] = [
 ];
 
 export function isCropHistory(value: unknown): value is CropHistory {
-  return Array.isArray(value) && value.length === 3 &&
-    value.every(id => CROPS.some(crop => crop.id === id));
+  return Array.isArray(value) && value.every(record =>
+    record && typeof record === 'object' && typeof record.id === 'string' && record.id.length > 0 &&
+    CROPS.some(crop => crop.id === record.cropId) &&
+    (record.plantedOn === null || isPlantingDate(record.plantedOn))) &&
+    new Set(value.map(record => record.id)).size === value.length;
 }
 
 export function getCrop(id: CropId) {
