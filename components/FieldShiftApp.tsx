@@ -3,8 +3,9 @@
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
-import { Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Sprout, Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
 import FieldOverview from './FieldOverview';
+import CropsModal from './CropsModal';
 import { BASE_STYLES, DATA_LAYERS, LAYER_IDS } from '@/lib/layers';
 import type { Coordinates, LayerId, LayerManifest, LayerStatus, MapStyleId, OverviewData, WeatherData } from '@/lib/types';
 import { useFields } from '@/lib/field-store';
@@ -42,6 +43,7 @@ export default function FieldShiftApp() {
   const [layerError, setLayerError] = useState<string | null>(null);
   const { fields, activeFieldId, hydrated, setActiveFieldId, saveField, updateFieldSnapshot, deleteField } = useFields();
   const [savedFieldsOpen, setSavedFieldsOpen] = useState(false);
+  const [cropsOpen, setCropsOpen] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -206,7 +208,7 @@ export default function FieldShiftApp() {
     if (!selection) return;
     const matched = fields.find(f => f.id === activeFieldId);
     const result = saveField({ name, point: selection, radius, placeLabel, nasa: data, weather }, matched?.id);
-    if (result) setToast(`Saved “${result.name}” on this device.`);
+    if (result) setToast(`Saved â€œ${result.name}â€ on this device.`);
     else setToast('Could not save: browser storage is not ready.');
   };
   const activeSavedField = fields.find(f => f.id === activeFieldId);
@@ -225,21 +227,24 @@ export default function FieldShiftApp() {
     <div className="absolute inset-0 bg-[linear-gradient(135deg,#a9bda2_0%,#d3cda4_45%,#7d9e88_100%)]" />
     {HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
 
-    {/* Account-free saved fields: persisted locally, accessible to a future Crops page. */}
+    {/* Account-free saved fields and crop histories, persisted locally. */}
     <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[58px] flex-col items-center border-r border-[#ebefeb] bg-white/95 px-1 py-3 shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[64px]">
       <div className="group flex flex-col items-center gap-1" title="FieldShift">
         <div className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#225c44] text-white"><Leaf size={19} strokeWidth={1.8}/></div>
         <span className="text-[8.5px] font-extrabold tracking-[-.04em] text-[#275641]">FieldShift</span>
       </div>
       <div className="mt-7 flex w-full flex-col items-center gap-2">
-        <button className="flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl bg-[#eef5ee] text-[#286048]" title="Explore" aria-current="page"><Map size={17}/><span className="text-[9px] font-semibold">Explore</span></button>
-        <button onClick={() => setSavedFieldsOpen(v => !v)} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={17}/><span className="text-[9px]">Fields</span></button>
+        <button onClick={() => { setSavedFieldsOpen(false); setCropsOpen(false); setHelpOpen(false); setShowOverview(true); }} className="flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl bg-[#eef5ee] text-[#286048]" title="Explore" aria-current="page"><Map size={17}/><span className="text-[9px] font-semibold">Explore</span></button>
+        <button onClick={() => { setSavedFieldsOpen(v => !v); setCropsOpen(false); setHelpOpen(false); }} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={17}/><span className="text-[9px]">Fields</span></button>
+        <button onClick={() => { setCropsOpen(true); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${cropsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Crops" aria-haspopup="dialog" aria-expanded={cropsOpen}><Sprout size={17}/><span className="text-[9px]">Crops</span></button>
       </div>
       <div className="mt-auto flex flex-col items-center gap-2 pb-1">
-        <button onClick={() => setHelpOpen(v => !v)} aria-label="How to use FieldShift" className="grid h-9 w-9 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={19}/></button>
+        <button onClick={() => { setHelpOpen(v => !v); setSavedFieldsOpen(false); setCropsOpen(false); }} aria-label="How to use FieldShift" className="grid h-9 w-9 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={19}/></button>
         <span className="text-[9px] text-[#9cab9f]">Help</span>
       </div>
     </nav>
+
+    {cropsOpen && <CropsModal onClose={() => setCropsOpen(false)}/>}
 
     {/* Place search and dataset pills */}
     <header className="pointer-events-none absolute left-[68px] right-3 top-3 z-20 md:left-[78px] md:right-5 md:top-4">
@@ -252,7 +257,7 @@ export default function FieldShiftApp() {
               {searchTerm && <button onClick={() => { setSearchTerm(''); setSearchResults([]); searchInput.current?.focus(); }} aria-label="Clear search" className="text-[#99a89d]"><X size={14}/></button>}
             </div>
             {searchFocused && searchTerm.length >= 2 && <div className="absolute inset-x-0 top-[50px] overflow-hidden rounded-xl bg-white shadow-float">
-              {searchLoading && <p className="p-3 text-[11px] text-[#8b998f]">Finding places…</p>}
+              {searchLoading && <p className="p-3 text-[11px] text-[#8b998f]">Finding placesâ€¦</p>}
               {searchError && <p className="p-3 text-[11px] text-amber-700">{searchError}</p>}
               {!searchLoading && !searchError && searchResults.map((r, i) => <button key={`${r.geometry.coordinates.join('-')}-${i}`} onClick={() => { handleSelect(r.geometry.coordinates, r.properties.name || 'Searched location', true); setSearchTerm(r.properties.full_address || r.properties.name || ''); searchInput.current?.blur(); }} className="flex w-full items-start gap-2 border-b border-[#f0f3ee] px-3 py-2.5 text-left hover:bg-[#f5f9f5]"><MapPin className="mt-0.5 shrink-0 text-[#5b876a]" size={15}/><span className="min-w-0"><strong className="block truncate text-[11px] text-[#31533e]">{r.properties.name || 'Location'}</strong><span className="block truncate text-[10px] text-[#90a095]">{r.properties.place_formatted || r.properties.full_address}</span></span></button>)}
               {!searchLoading && !searchError && !searchResults.length && <p className="p-3 text-[11px] text-[#8b998f]">No matching places. Try another search or click the map.</p>}
@@ -262,14 +267,14 @@ export default function FieldShiftApp() {
         </div>
         <div className="pointer-events-auto hidden shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-soft lg:flex">
           <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef4ea] text-[#447953]"><Sun size={17}/></span>
-          <span><span className="block text-[11px] font-bold text-[#344d3d]">NASA Earth Explorer</span><span className="block text-[9px] text-[#8fa092]">Observed data · not a live forecast</span></span>
+          <span><span className="block text-[11px] font-bold text-[#344d3d]">NASA Earth Explorer</span><span className="block text-[9px] text-[#8fa092]">Observed data Â· not a live forecast</span></span>
         </div>
       </div>
       <div className="pointer-events-auto soft-scroll mt-2.5 flex max-w-[730px] gap-1.5 overflow-x-auto pb-1">
         {layerOrder.map(id => {
           const selected = enabledLayers.includes(id);
           const status = statuses.find(s => s.id === id);
-          return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={selected} title={`${DATA_LAYERS[id].details}${status?.date ? ` · ${fmtDate(status.date)}` : ''}`} className={`flex h-[29px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold shadow-sm transition-colors ${selected ? 'border-[#245d45] bg-[#235f46] text-white' : 'border-white/90 bg-white/95 text-[#627666] hover:bg-[#f1f7ef]'}`}>
+          return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={selected} title={`${DATA_LAYERS[id].details}${status?.date ? ` Â· ${fmtDate(status.date)}` : ''}`} className={`flex h-[29px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold shadow-sm transition-colors ${selected ? 'border-[#245d45] bg-[#235f46] text-white' : 'border-white/90 bg-white/95 text-[#627666] hover:bg-[#f1f7ef]'}`}>
             <span className={selected ? 'text-[#d4f2d7]' : 'text-[#5e8a6b]'}>{layerIcons[id]}</span>{DATA_LAYERS[id].label}
             {selected && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[#bdf7b5]" />}
           </button>;
@@ -278,18 +283,18 @@ export default function FieldShiftApp() {
       </div>
     </header>
 
-    {selection && showOverview && <aside className="absolute bottom-[76px] left-[69px] top-[131px] z-10 w-[min(329px,calc(100vw-84px))] md:bottom-[76px] md:left-[79px] md:top-[127px] md:w-[335px]">
+    {selection && showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && <aside className="absolute bottom-[76px] left-[69px] top-[131px] z-10 w-[min(329px,calc(100vw-84px))] md:bottom-[76px] md:left-[79px] md:top-[127px] md:w-[335px]">
       <FieldOverview selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} weather={weather} weatherLoading={weatherLoading} weatherError={weatherError} weatherNotConfigured={weatherNotConfigured} placeLabel={placeLabel} preview={preview}/>
     </aside>}
 
-    {selection && !showOverview && <button onClick={() => setShowOverview(true)} className="absolute left-[78px] top-[136px] z-10 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[11px] font-semibold text-[#286048] shadow-float"><ChevronRight size={16}/> View area overview</button>}
+    {selection && !showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && <button onClick={() => setShowOverview(true)} className="absolute left-[78px] top-[136px] z-10 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[11px] font-semibold text-[#286048] shadow-float"><ChevronRight size={16}/> View area overview</button>}
 
     {savedFieldsOpen && <div className="absolute bottom-[76px] left-[69px] top-[133px] z-20 w-[min(316px,calc(100vw-84px))] overflow-y-auto rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:left-[79px]">
       <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-[#2b5038]">Saved fields</h3><button onClick={() => setSavedFieldsOpen(false)} aria-label="Close saved fields" className="text-[#869a8c]"><X size={17}/></button></div>
-      <p className="mt-1 text-[10px] text-[#93a297]">Stored on this device · {fields.length} fields</p>
+      <p className="mt-1 text-[10px] text-[#93a297]">Stored on this device Â· {fields.length} fields</p>
       {fields.length === 0 && <p className="mt-4 rounded-xl bg-[#f4f8f3] p-3 text-[11px] leading-relaxed text-[#7c8e80]">Select an area and use Save field in the overview. It will stay here even after you close the browser.</p>}
       <div className="mt-3 space-y-2">{fields.map(field => <div key={field.id} className="flex items-center gap-2 rounded-xl border border-[#e6eee6] p-2">
-        <button onClick={() => loadField(field.id)} className="min-w-0 flex-1 p-1 text-left hover:text-[#236b48]"><strong className="block truncate text-[11px]">{field.name}</strong><small className="block text-[9px] text-[#90a095]">{field.point[1].toFixed(4)}, {field.point[0].toFixed(4)} · {field.radius} m</small><small className="block text-[9px] text-[#8da093]">{field.nasa ? 'NASA saved' : 'NASA pending'} · {field.weather ? 'Weather saved' : 'Weather pending'}</small></button>
+        <button onClick={() => loadField(field.id)} className="min-w-0 flex-1 p-1 text-left hover:text-[#236b48]"><strong className="block truncate text-[11px]">{field.name}</strong><small className="block text-[9px] text-[#90a095]">{field.point[1].toFixed(4)}, {field.point[0].toFixed(4)} Â· {field.radius} m</small><small className="block text-[9px] text-[#8da093]">{field.nasa ? 'NASA saved' : 'NASA pending'} Â· {field.weather ? 'Weather saved' : 'Weather pending'}</small></button>
         <button onClick={() => { deleteField(field.id); if (field.id === activeFieldId) clearSelection(); }} aria-label={`Delete ${field.name}`} title="Delete saved field" className="rounded-lg p-2 text-[#a3aaa3] hover:bg-red-50 hover:text-red-600"><Trash2 size={15}/></button>
       </div>)}</div>
     </div>}
@@ -332,7 +337,7 @@ export default function FieldShiftApp() {
         const status = statuses.find(s => s.id === id);
         const enabled = enabledLayers.includes(id);
         return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={enabled} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-[#f6f9f5]">
-          <span className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#eef6ed] text-[#3b7853]">{layerIcons[id]}</span><span className="min-w-0"><strong className="block text-[11px] font-semibold">{DATA_LAYERS[id].label}</strong><small className="block truncate text-[9px] text-[#96a49b]">{status?.date ? `NASA · ${fmtDate(status.date)}` : layerError ? 'Catalog unavailable' : status ? 'No available imagery' : 'Checking NASA…'}</small></span></span><span className="switch" data-on={enabled}/>
+          <span className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#eef6ed] text-[#3b7853]">{layerIcons[id]}</span><span className="min-w-0"><strong className="block text-[11px] font-semibold">{DATA_LAYERS[id].label}</strong><small className="block truncate text-[9px] text-[#96a49b]">{status?.date ? `NASA Â· ${fmtDate(status.date)}` : layerError ? 'Catalog unavailable' : status ? 'No available imagery' : 'Checking NASAâ€¦'}</small></span></span><span className="switch" data-on={enabled}/>
         </button>;
       })}</div>
       {layerError && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[10px] text-amber-700">{layerError}</p>}

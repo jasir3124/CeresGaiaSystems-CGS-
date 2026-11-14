@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Coordinates, OverviewData, WeatherData } from './types';
+import { isCropHistory, type CropHistory } from './crops';
 
 export interface SavedField {
   id: string;
@@ -13,6 +14,7 @@ export interface SavedField {
   weather: WeatherData | null;
   savedAt: string;
   updatedAt: string;
+  cropHistory?: CropHistory;
 }
 
 type Snapshot = { nasa?: OverviewData | null; weather?: WeatherData | null };
@@ -21,7 +23,8 @@ type FieldsContextType = {
   activeFieldId: string | null;
   hydrated: boolean;
   setActiveFieldId: (id: string | null) => void;
-  saveField: (value: Omit<SavedField, 'id' | 'savedAt' | 'updatedAt'>, existingId?: string | null) => SavedField | null;
+  saveField: (value: Omit<SavedField, 'id' | 'savedAt' | 'updatedAt' | 'cropHistory'>, existingId?: string | null) => SavedField | null;
+  saveFieldCrops: (id: string, crops: CropHistory) => boolean;
   updateFieldSnapshot: (id: string, snapshot: Snapshot) => void;
   deleteField: (id: string) => void;
 };
@@ -47,7 +50,9 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      if (Array.isArray(parsed)) setFields(parsed.filter(isField).slice(0, 100));
+      if (Array.isArray(parsed)) setFields(parsed.filter(isField).slice(0, 100).map(field => ({
+        ...field, cropHistory: isCropHistory(field.cropHistory) ? field.cropHistory : undefined
+      })));
       setActiveFieldIdState(localStorage.getItem(ACTIVE_KEY));
     } catch (error) { console.warn('Could not read saved fields', error); }
     setHydrated(true);
@@ -77,6 +82,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       const existing = fields.find(f => f.id === existingId);
       const result: SavedField = {
         ...field,
+        cropHistory: existing?.cropHistory,
         id: existing?.id || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `field-${Date.now()}-${Math.random().toString(36).slice(2)}`),
         savedAt: existing?.savedAt ?? now,
         updatedAt: now
@@ -93,6 +99,20 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       setFields(next);
       setActiveFieldIdState(result.id);
       return result;
+    },
+    saveFieldCrops: (id, crops) => {
+      if (!hydrated || !isCropHistory(crops) || !fields.some(field => field.id === id)) return false;
+      const next = fields.map(field => field.id === id ? {
+        ...field, cropHistory: [...crops] as CropHistory, updatedAt: new Date().toISOString()
+      } : field);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch (error) {
+        console.warn('Could not save crop history', error);
+        return false;
+      }
+      setFields(next);
+      return true;
     },
     updateFieldSnapshot: (id, snapshot) => {
       setFields(current => current.map(f => f.id === id ? {
@@ -111,7 +131,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
   return <FieldsContext.Provider value={value}>{children}</FieldsContext.Provider>;
 }
 
-/** Shared hook for Explore now and the future Crops page. */
+/** Shared saved fields and crop histories for Explore and Crops. */
 export function useFields() {
   const context = useContext(FieldsContext);
   if (!context) throw new Error('useFields must be used inside FieldsProvider');

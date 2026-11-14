@@ -1,0 +1,107 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Sprout, X } from 'lucide-react';
+import { CROPS, getCrop, growingMonths, isCropHistory, type CropId } from '@/lib/crops';
+import { useFields } from '@/lib/field-store';
+
+type Draft = [CropId | '', CropId | '', CropId | ''];
+const questions = ['What was the most recent crop?', 'Which crop grew before that?', 'And which crop grew before that?'];
+const periods = ['Most recent', 'Previous crop', 'Oldest crop'];
+const selectClass = 'mt-2 w-full rounded-xl border border-[#dbe6da] bg-white px-3 py-2.5 text-sm text-[#2b5038] outline-none focus:border-[#397c58] focus:ring-2 focus:ring-[#397c58]/20';
+
+export default function CropsModal({ onClose }: { onClose: () => void }) {
+  const { fields, activeFieldId, hydrated, saveFieldCrops } = useFields();
+  const [selectedId, setSelectedId] = useState(activeFieldId ?? fields[0]?.id ?? '');
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [messages, setMessages] = useState<Record<string, { text: string; error: boolean }>>({});
+  const dialog = useRef<HTMLDialogElement>(null);
+  const field = fields.find(item => item.id === selectedId) ?? fields[0];
+  const draft: Draft = field ? drafts[field.id] ?? field.cropHistory ?? ['', '', ''] : ['', '', ''];
+  const message = field ? messages[field.id] : undefined;
+  const hasChanges = Boolean(field && draft.some((id, index) => id !== (field.cropHistory?.[index] ?? '')));
+
+  useEffect(() => {
+    const element = dialog.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    element?.showModal();
+    return () => { element?.close(); previouslyFocused?.focus(); };
+  }, []);
+
+  return <dialog ref={dialog} aria-labelledby="crops-title" onCancel={event => { event.preventDefault(); onClose(); }} className="m-auto max-h-[90dvh] w-[calc(100%-24px)] max-w-3xl overflow-y-auto rounded-2xl bg-[#fbfcf9] p-0 text-[#2b5038] shadow-2xl backdrop:bg-[#102e20]/45 backdrop:backdrop-blur-sm">
+    <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[#e3ebe0] bg-white p-5 sm:px-7">
+      <div className="flex items-center gap-3">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#eaf3e5] text-[#397c58]"><Sprout size={24}/></span>
+        <div><h2 id="crops-title" className="text-xl font-bold">Crops</h2><p className="mt-0.5 text-xs text-[#71836f]">Your fields, season by season</p></div>
+      </div>
+      <button type="button" onClick={onClose} aria-label="Close crops" className="rounded-lg p-2 text-[#71836f] hover:bg-[#edf3e9]"><X size={20}/></button>
+    </header>
+
+    {!hydrated ? <p className="p-7 text-sm">Loading your fields...</p> : !field ? <div className="p-7">
+      <h3 className="font-semibold">Save your first field to add crops</h3>
+      <p className="mt-2 text-sm leading-relaxed text-[#71836f]">Select an area on the map, then choose Save field in the area overview. Come back here to record its last three crops.</p>
+      <button onClick={onClose} className="mt-5 rounded-xl bg-[#286048] px-4 py-2.5 text-sm font-semibold text-white">Back to map</button>
+    </div> : <div className="grid gap-6 p-5 sm:p-7 md:grid-cols-[190px_minmax(0,1fr)]">
+      <aside className="min-w-0">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#71836f]">Your fields ({fields.length})</h3>
+        <p className="mt-1 text-xs text-[#71836f]">Saved crops, newest first</p>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-2 md:max-h-[60dvh] md:flex-col md:overflow-y-auto">
+          {fields.map(item => <button type="button" key={item.id} onClick={() => setSelectedId(item.id)} aria-pressed={item.id === field.id} className={`min-w-[160px] rounded-xl border p-3 text-left transition md:min-w-0 ${item.id === field.id ? 'border-[#91b28a] bg-[#edf4e7]' : 'border-[#e3ebe0] bg-white hover:border-[#91b28a]'}`}>
+            <strong className="block break-words text-sm">{item.name}</strong>
+            <span className="mt-1 block text-[10px] text-[#71836f]">{item.point[1].toFixed(4)}, {item.point[0].toFixed(4)}</span>
+            {item.cropHistory ? <ol className="mt-2 space-y-1 text-xs text-[#58704f]">{item.cropHistory.map((id, index) => <li key={index}>{index + 1}. {getCrop(id).name}</li>)}</ol> : <span className="mt-2 block text-xs text-[#71836f]">No crops recorded yet</span>}
+          </button>)}
+        </div>
+      </aside>
+
+      <section className="min-w-0">
+        <label htmlFor="crop-field" className="text-xs font-semibold">Which field are you recording?</label>
+        <select id="crop-field" value={field.id} onChange={event => setSelectedId(event.target.value)} className={selectClass}>
+          {fields.map(item => <option key={item.id} value={item.id}>{item.name} ({item.point[1].toFixed(4)}, {item.point[0].toFixed(4)})</option>)}
+        </select>
+        <h3 className="mt-6 text-base font-bold">What were the last three crops?</h3>
+        <p className="mt-1 text-xs leading-relaxed text-[#71836f]">Start with the most recently grown crop. You can select the same crop more than once.</p>
+        <form className="mt-4 space-y-3" onSubmit={event => {
+          event.preventDefault();
+          if (!isCropHistory(draft)) return;
+          const saved = saveFieldCrops(field.id, draft);
+          setMessages(current => ({ ...current, [field.id]: { error: !saved, text: saved ? `Crop history saved for ${field.name} on this device.` : 'Could not save crop history. Check that browser storage is available and try again.' } }));
+        }}>
+          {questions.map((question, index) => {
+            const crop = draft[index] ? getCrop(draft[index] as CropId) : null;
+            const months = crop ? growingMonths(crop) : null;
+            return <div key={index} className="rounded-xl border border-[#e3ebe0] bg-white p-3 sm:p-4">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#7a936c]">{index + 1} / {periods[index]}</span>
+              <label htmlFor={`crop-${index}`} className="mt-1 block text-xs font-semibold">{question}</label>
+              <select id={`crop-${index}`} required value={draft[index]} className={selectClass} onChange={event => {
+                const next: Draft = [...draft];
+                next[index] = event.target.value as CropId | '';
+                setDrafts(current => ({ ...current, [field.id]: next }));
+                setMessages(current => { const nextMessages = { ...current }; delete nextMessages[field.id]; return nextMessages; });
+              }}>
+                <option value="">Select a crop</option>
+                {CROPS.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+              {crop && months && <details className="mt-2 text-xs text-[#71836f]">
+                <summary className="cursor-pointer py-1">Growing conditions</summary>
+                <dl className="mt-2 grid grid-cols-2 gap-3 text-[11px]">
+                  <div><dt>Optimum temperature</dt><dd className="mt-0.5 font-semibold text-[#2b5038]">{crop.optimumTemperatureC.min}–{crop.optimumTemperatureC.max} °C</dd></div>
+                  <div><dt>Optimum annual rainfall</dt><dd className="mt-0.5 font-semibold text-[#2b5038]">{crop.optimumAnnualRainfallMm.min}–{crop.optimumAnnualRainfallMm.max} mm/year</dd></div>
+                  <div><dt>Growing duration</dt><dd className="mt-0.5 font-semibold text-[#2b5038]">≈ {months.min}–{months.max} months</dd></div>
+                  <div><dt>Optimum soil pH</dt><dd className="mt-0.5 font-semibold text-[#2b5038]">{crop.optimumSoilPh.min}–{crop.optimumSoilPh.max}</dd></div>
+                </dl>
+                <p className="mt-3 leading-relaxed">General ranges vary by variety and location. Rainfall is an annual climate range; growing duration is not a planting calendar.</p>
+                <a href={crop.sourceUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block font-semibold text-[#397c58] underline">FAO EcoCrop reference</a>
+              </details>}
+            </div>;
+          })}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <span className="text-xs text-[#71836f]">{hasChanges ? 'Unsaved changes for this field' : field.cropHistory ? 'Saved on this device' : 'Choose all three crops to save'}</span>
+            <button type="submit" disabled={!isCropHistory(draft) || !hasChanges} className="rounded-xl bg-[#286048] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1c4e38] disabled:cursor-not-allowed disabled:opacity-40">Save crop history</button>
+          </div>
+          {message && <p role={message.error ? 'alert' : 'status'} className={`rounded-lg p-3 text-xs ${message.error ? 'bg-red-50 text-red-700' : 'bg-[#edf4e7] text-[#286048]'}`}>{message.text}</p>}
+        </form>
+      </section>
+    </div>}
+  </dialog>;
+}

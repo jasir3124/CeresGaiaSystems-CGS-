@@ -63,6 +63,12 @@ METEOMATICS_PASSWORD=YOUR_METEOMATICS_PASSWORD
 
 ## Development checks
 
+### Crop histories
+
+Open **Crops** in the sidebar, select a saved field, and record its last three crops (most recent first). Repeated crops are allowed. Each field's history is stored on this device alongside its saved geometry and snapshots, and survives field updates and page reloads. Fields saved before this feature simply start without a crop history.
+
+`lib/crops.ts` defines seven crops with stable IDs, family, optimum temperature (Celsius), optimum **annual** rainfall (mm/year), growing duration (days, displayed as approximate months), soil pH, and individual FAO EcoCrop source links. These broad species ranges vary by cultivar and region. Annual rainfall must not be compared directly with seven-day rain totals or treated as irrigation demand. Growing duration is not a regional planting calendar. Future analysis can join each field's `cropHistory` IDs to `CROPS`; missing histories remain missing rather than being inferred.
+
 ```powershell
 npm run test:geo
 npm run typecheck
