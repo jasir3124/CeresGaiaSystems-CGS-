@@ -8,10 +8,10 @@ body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Se
 button, input { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, input:focus-visible { outline: 3px solid #97c4a4; outline-offset: 2px; }
-.mapboxgl-control-container .mapboxgl-ctrl-bottom-left { bottom: 4px; left: 4px; }
-.mapboxgl-ctrl-attrib { font-size: 10px !important; }
-.mapboxgl-ctrl-logo { opacity: .68; }
-.mapboxgl-marker { z-index: 2; }
+.maplibregl-control-container .maplibregl-ctrl-bottom-left { bottom: 4px; left: 4px; }
+.maplibregl-ctrl-attrib { font-size: 10px !important; }
+.maplibregl-ctrl-logo { opacity: .68; }
+.maplibregl-marker { z-index: 2; }
 .map-pin { width: 48px; height: 55px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; cursor: grab; user-select: none; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, .32)); }
 .map-pin:active { cursor: grabbing; }
 .map-pin-inner { background: #1e6045; color: white; border: 2px solid white; border-radius: 50% 50% 50% 8px; width: 35px; height: 35px; display: grid; place-items: center; transform: rotate(-45deg); }
@@ -24,4 +24,4 @@ button:focus-visible, input:focus-visible { outline: 3px solid #97c4a4; outline-
 .switch[data-on='true'] { background: #225c46; }
 .switch[data-on='true']::after { transform: translateX(15px); }
 input[type='range'] { accent-color: #236449; }
-@media (max-width: 720px) { body { overflow: hidden; } .mapboxgl-ctrl-bottom-right { bottom: 0; } }
+@media (max-width: 720px) { body { overflow: hidden; } .maplibregl-ctrl-bottom-right { bottom: 0; } }

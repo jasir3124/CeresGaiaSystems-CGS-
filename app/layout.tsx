@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import "mapbox-gl/dist/mapbox-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { FieldsProvider } from "@/lib/field-store";
 
 export const metadata: Metadata = {
   title: "FieldShift | Explore with NASA",
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><FieldsProvider>{children}</FieldsProvider></body></html>;
 }

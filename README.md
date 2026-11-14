@@ -1,57 +1,80 @@
-# FieldShift — NASA Earth data explorer (V1)
+# FieldShift V2 — MapTiler, MapLibre, NASA & Meteomatics
 
-**No accounts. No saved fields. No crop recommendations or chat.** A map-first agriculture explorer modeled on the reference screenshot, but without making up climate values.
+No accounts required inside FieldShift. A Next.js 15 / React 19 / Tailwind CSS prototype for choosing locations on satellite imagery and seeing source-labeled environmental data.
 
-## Run it
+## Run it (Windows / PowerShell)
 
-Requires Node.js 20.9+ and a free Mapbox public access token.
+1. Get a MapTiler API key: https://cloud.maptiler.com/account/keys/
+2. Get Meteomatics API credentials from the Space Apps Global Offer (username and password, not an API token): https://www.meteomatics.com/en/api/getting-started/
+3. Extract this ZIP into a **new project folder**. Do not copy `node_modules` or `.next` from an older FieldShift version.
+4. In the project folder run:
 
-```bash
+```powershell
 npm install
-cp .env.example .env.local
-# Edit .env.local and set NEXT_PUBLIC_MAPBOX_TOKEN to your Mapbox pk.* token
-npm run dev
+Copy-Item .env.example .env.local
 ```
 
-Open http://localhost:3000. You can get a public token from https://account.mapbox.com/access-tokens/. For production, set an allow-list of your site's URLs in the token settings. There is **no NASA API key requirement** for the endpoints used here.
+5. Edit `.env.local`:
 
-## How to use
+```env
+NEXT_PUBLIC_MAPTILER_KEY=YOUR_MAPTILER_KEY
+METEOMATICS_USERNAME=YOUR_METEOMATICS_USERNAME
+METEOMATICS_PASSWORD=YOUR_METEOMATICS_PASSWORD
+```
 
-1. Search for a place (Mapbox geocoding), or click any location on the map.
-2. Drag the pin to fine-tune the location. A green circle shows your selected radius.
-3. Adjust the radius with the slider, from 25 m to 5,000 m. The dashed square is the matching **bounding box** (west, south, east, north), ready for NASA datasets that need corners rather than one point.
-4. Open the field overview to see real NASA POWER observations for the pin's coordinates. The API requests run **on the server**, snap to a nearby coarse POWER grid coordinate to reduce duplicate NASA calls, and return latest available recorded dates. No fabricated temperatures or soil values are substituted on failure.
-5. Switch map style among Satellite, Streets, Terrain, and Dark. Use NASA data-layer switches to overlay GIBS visualizations: rainfall (GPM IMERG), soil moisture (SMAP), vegetation (MODIS NDVI), land-surface temperature (MODIS), and monthly wind speed (MERRA-2). Layer dates come from NASA's WMS capabilities and are shown in the UI.
-6. Optional: turn the dashed data-bounds square on or off. Press **Copy bbox** in the overview to export four numbers.
+6. Run `npm run dev` and open http://localhost:3000. Restart Next.js whenever you modify `.env.local`.
 
-## Architecture
+### Keys and privacy
 
-| Code | Purpose | Source |
-|---|---|---|
-| `components/MapCanvas.tsx` | Mapbox styles, draggable pin, circle and square, NASA WMS overlays | Mapbox GL JS and NASA GIBS WMS |
-| `components/FieldShiftApp.tsx` | Map-first controls and responsive explorer UI | React / Tailwind |
-| `components/FieldOverview.tsx` | Numeric values, chart, source and date labels | Server API |
-| `app/api/nasa/overview/route.ts` | Point-data service, validates input and proxies NASA POWER | https://power.larc.nasa.gov/api/temporal/daily/point |
-| `app/api/nasa/layers/route.ts` | Discovers latest GIBS WMS layer dates, server-cached | https://gibs.earthdata.nasa.gov/wms/epsg3857/best/wms.cgi |
-| `app/api/nasa/region-image/route.ts` | Cropped imagery using all four user-selected square coordinates | NASA GIBS WMS |
-| `lib/geo.mjs` | Spherical circle and bounding square geometry | Local computations |
+- `NEXT_PUBLIC_MAPTILER_KEY` is a *public* browser-side map key. Apply allowed-origin restrictions for production.
+- **Meteomatics username/password must never use a `NEXT_PUBLIC_` prefix.** They're only read in the server-side `/api/weather` route. Do not commit `.env.local` to Git.
+- NASA POWER and GIBS endpoints used here do not require a key.
+- Local saved fields are **only stored in your browser's `localStorage`**, not sent to an application database. They will be lost if the browser's site data is cleared; they're not synced between devices.
 
-## Important scientific and UX notes
+## What changed since V1
 
-- **Observed, not live:** POWER daily observations and GIBS layers can lag real time, and the wind visualization is a **monthly** MERRA-2 dataset, not a live wind forecast. The UI shows actual available dates from providers, not the current clock date.
-- **Air vs land temperature:** The overview's NASA POWER `T2M` is 2-meter air temperature. The selectable GIBS temperature overlay is **land-surface temperature**. They measure different things.
-- **Soil wetness vs measured soil moisture:** The numeric soil metric is NASA POWER HY `GWETTOP`, a modeled fractional surface-wetness parameter converted to percentage for display. The SMAP raster is a separate satellite product (~9 km resolution). Neither can measure conditions precisely across a small field or replace an in-ground probe.
-- **Field-level detail:** The circle and square are user-selected geometry, not automatically detected farm boundaries. Nearby fields often share identical coarse-resolution observations. Mapbox imagery has finer visual detail, but that does not make NASA grid metrics field-scale.
-- **Rain totals:** A displayed 7-day amount is the sum of last 7 available calendar days ending on the latest NASA rain date. If only some days are present, the UI explicitly displays how many of seven contributed.
-- **Data visualizations:** NASA GIBS overlays are images, not quantitative extraction. A green NDVI-looking map is **not** a measured field-specific vegetation-health percentage. Those analyses are intentionally reserved for a later version.
-- **Geographic extent:** The bounding box is drawn on the map, can be copied, and is passed directly to NASA GIBS WMS for the selected-square satellite imagery preview when a NASA layer is enabled. Global NASA GIBS map layers separately request tile bounding boxes. NASA POWER point requests use a nearby quantized point derived from the pin (to respect its coarse grid and caching guidance); regional *numeric averaging* and true field-boundary polygons remain future work.
-- **Performance:** NASA POWER results are cached for 6 hours server-side; GIBS layer catalog for 12 hours. For deployment, add rate limiting if usage is large. Some GIBS overlays have coarse resolution and may look mostly uniform at farm zoom.
-- **Mapbox:** A Mapbox token is required for all map views and place search. NASA layers are public and do not require the user's NASA credentials.
+- **Meteomatics:** `/api/weather` fetches a 24-hour weather time series (3-hour steps) with temperature, relative humidity, 10 m wind, wind direction, and precipitation over the preceding hour. Forecast appears in the overview, separate from historical NASA data. If credentials are missing or unavailable, it shows a configured/unavailable message rather than made-up values. Backend fetch caching is ~1 hour per approximate 0.01° point to conserve your subscription quota. This does **not** make Meteomatics weather a raster map overlay; the existing map overlays remain NASA GIBS.
+- **NASA surface soil wetness:** NASA POWER HY `GWETTOP` is checked for actual valid fraction values. If missing or rejected, we request NASA POWER HY `SFMC` (volumetric surface moisture). The UI changes its name to *Surface soil moisture* when it shows `SFMC`, because the two measurements are different. If neither is available, the card stays blank and displays the error/availability explanation. The original V1 silently swallowed hydrology failures.
+- **Save field:** name a selection and click **Save field to this device**. The **Fields** sidebar button lists saved fields and lets you reselect or delete them. Records include coordinates, radius, NASA overview JSON, Meteomatics forecast JSON, and save timestamps. The last active saved field is automatically reopened on reload. New API results enrich saved records even if Save was clicked while loading.
+- **Future Crops support:** `useFields()` from `lib/field-store.tsx` shares saved state through `FieldsProvider` in `app/layout.tsx`. Crops can read `fields` and `activeFieldId` without new API requests.
+- **Single NASA overlay:** selecting a rainfall, soil moisture, vegetation, temperature, or wind layer turns off the old layer. Clicking the active layer disables it.
+- **Simplified UI:** the square bounding-box toggle, coordinate copying, and on-map square outline are gone. NASA GIBS region-image requests *still* use internal bounding boxes. The long yellow disclaimer is removed, but individual data dates and source definitions remain accessible under **About data sources**.
+- **Close versus clear:** the overview's X now closes only the panel. The selected pin/radius remain; use **Overview** or **View area overview** to return. A separate “Clear selection from map” control removes the temporary pin without deleting any stored field.
 
-## Attribution
+## Data flows
 
-NASA Earth data: [NASA POWER](https://power.larc.nasa.gov/) and [NASA GIBS / Earthdata](https://www.earthdata.nasa.gov/data/tools/gibs). Basemap and geocoding: [Mapbox](https://www.mapbox.com/). NASA does not endorse the app. Comply with provider license/attribution terms.
+| Purpose | Source | Query geometry |
+| --- | --- | --- |
+| Basemap imagery, map styles, geocoding | MapTiler via MapLibre | Map tiles / map search |
+| Historical air temperature, humidity, precipitation, wind, solar | NASA POWER Daily AG | Nearby ~0.5° grid coordinate |
+| Historical surface wetness / volumetric moisture | NASA POWER Daily HY (`GWETTOP` / `SFMC`) | Nearby ~0.5° grid coordinate |
+| Rain, soil moisture, vegetation, heat, historical wind imagery | NASA GIBS WMS | Map raster tiles, dynamically dated |
+| Area-specific NASA GIBS thumbnail | NASA GIBS WMS GetMap | Internal bounds from selected pin & radius |
+| Forecast temperature, humidity, wind, rain | Meteomatics Weather API | Approximate 0.01° query location |
 
-## Tests
+**Scientific accuracy:** NASA POWER and GIBS don't provide direct measurements at individual 25–100 m fields. Their model/grid resolution and latest available dates are shown in context. Meteomatics represents current or forecast weather estimates, not in-field sensors. A point query is not a spatial average of the chosen circle.
 
-`npm run test:geo` checks the geodesic selection helpers. `npm run typecheck` and `npm run build` check the Next.js application after installing dependencies.
+## API routes
+
+- `GET /api/nasa/overview?lat=42.009&lng=20.995`
+- `GET /api/nasa/layers`
+- `GET /api/nasa/region-image?layer=soil&date=...&west=...&south=...&east=...&north=...`
+- `GET /api/weather?lat=42.009&lng=20.995`
+
+## Development checks
+
+```powershell
+npm run test:geo
+npm run typecheck
+npm run build
+```
+
+The geometry tests and TypeScript syntax-level tests passed when this package was produced. A complete Next.js build and external NASA/Meteomatics API integration test were not possible in the packaging environment because package installation timed out. Run `npm install` followed by the checks above on your machine.
+
+## Upstream documentation
+
+- NASA POWER daily API: https://power.larc.nasa.gov/docs/services/api/temporal/daily/
+- NASA POWER hydrology parameters: https://power.larc.nasa.gov/docs/methodology/data/sources_hydrology/
+- Meteomatics API structure / authentication: https://www.meteomatics.com/en/api/getting-started/
+- Meteomatics JSON response: https://www.meteomatics.com/en/api/response/json/
+- MapTiler: https://docs.maptiler.com/cloud/api/reference/

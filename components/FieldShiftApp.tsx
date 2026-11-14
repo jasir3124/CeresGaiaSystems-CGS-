@@ -2,15 +2,16 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type mapboxgl from 'mapbox-gl';
-import { Activity, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
+import type maplibregl from 'maplibre-gl';
+import { Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, ChevronRight, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
 import FieldOverview from './FieldOverview';
 import { BASE_STYLES, DATA_LAYERS, LAYER_IDS } from '@/lib/layers';
-import type { Coordinates, LayerId, LayerManifest, LayerStatus, MapStyleId, OverviewData } from '@/lib/types';
+import type { Coordinates, LayerId, LayerManifest, LayerStatus, MapStyleId, OverviewData, WeatherData } from '@/lib/types';
+import { useFields } from '@/lib/field-store';
 
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
-const configuredToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
-const TOKEN = configuredToken.startsWith('pk.') && configuredToken.length > 50 && !configuredToken.includes('your_') ? configuredToken : '';
+const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY || '';
+const HAS_MAP_KEY = MAPTILER_KEY.length > 5 && !MAPTILER_KEY.includes('your_');
 const layerIcons: Record<LayerId, React.ReactNode> = {
   soil: <Droplets size={14}/>,
   temperature: <Thermometer size={14}/>,
@@ -31,7 +32,6 @@ function fmtDate(value: string | null) {
 export default function FieldShiftApp() {
   const [selection, setSelection] = useState<Coordinates | null>(null);
   const [radius, setRadius] = useState(100);
-  const [showBounds, setShowBounds] = useState(true);
   const [showOverview, setShowOverview] = useState(true);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
   const [styleId, setStyleId] = useState<MapStyleId>('satellite');
@@ -40,7 +40,13 @@ export default function FieldShiftApp() {
   const [enabledLayers, setEnabledLayers] = useState<LayerId[]>([]);
   const [layerManifest, setLayerManifest] = useState<LayerManifest | null>(null);
   const [layerError, setLayerError] = useState<string | null>(null);
+  const { fields, activeFieldId, hydrated, setActiveFieldId, saveField, updateFieldSnapshot, deleteField } = useFields();
+  const [savedFieldsOpen, setSavedFieldsOpen] = useState(false);
   const [data, setData] = useState<OverviewData | null>(null);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [weatherNotConfigured, setWeatherNotConfigured] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [refreshIndex, setRefreshIndex] = useState(0);
@@ -52,9 +58,25 @@ export default function FieldShiftApp() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
+  const [mapInstance, setMapInstance] = useState<maplibregl.Map | null>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const searchAbort = useRef<AbortController | null>(null);
+
+  // Restore the user's last saved selection after loading localStorage.
+  useEffect(() => {
+    if (!hydrated || !activeFieldId) return;
+    const field = fields.find(f => f.id === activeFieldId);
+    if (!field) return;
+    setSelection(field.point);
+    setRadius(field.radius);
+    setPlaceLabel(field.name);
+    setData(field.nasa);
+    setWeather(field.weather);
+    setFocus({ coords: field.point, nonce: Date.now() });
+    setShowOverview(true);
+    // Hydration is intentionally the only trigger; saving a new field must not reset the map.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -70,7 +92,8 @@ export default function FieldShiftApp() {
   useEffect(() => {
     if (!selection) { setData(null); setDataError(null); setDataLoading(false); return; }
     const ctrl = new AbortController();
-    setData(null); setDataError(null); setDataLoading(true);
+    const saved = fields.find(f => f.id === activeFieldId && f.point[0] === selection[0] && f.point[1] === selection[1]);
+    setData(saved?.nasa ?? null); setDataError(null); setDataLoading(true);
     const query = new URLSearchParams({ lng: selection[0].toFixed(4), lat: selection[1].toFixed(4) });
     fetch(`/api/nasa/overview?${query.toString()}`, { signal: ctrl.signal }).then(async res => {
       const json = await res.json();
@@ -82,18 +105,61 @@ export default function FieldShiftApp() {
   }, [selection, refreshIndex]);
 
   useEffect(() => {
-    if (!searchFocused || searchTerm.trim().length < 2 || !TOKEN) { setSearchResults([]); setSearchLoading(false); return; }
+    if (!selection) { setWeather(null); setWeatherError(null); setWeatherLoading(false); setWeatherNotConfigured(false); return; }
+    const saved = fields.find(f => f.id === activeFieldId && f.point[0] === selection[0] && f.point[1] === selection[1]);
+    setWeather(saved?.weather ?? null);
+    setWeatherLoading(true); setWeatherError(null); setWeatherNotConfigured(false);
+    const controller = new AbortController();
+    const params = new URLSearchParams({ lng: selection[0].toFixed(5), lat: selection[1].toFixed(5) });
+    fetch(`/api/weather?${params}`, { signal: controller.signal }).then(async response => {
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'Forecast unavailable');
+      if (json.configured === false) { setWeatherNotConfigured(true); return; }
+      setWeather(json as WeatherData);
+    }).catch(error => { if (error.name !== 'AbortError') setWeatherError(error.message || 'Weather forecast unavailable'); })
+      .finally(() => { if (!controller.signal.aborted) setWeatherLoading(false); });
+    return () => controller.abort();
+  // Fields are intentionally loaded on coordinate selection or explicit refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection, refreshIndex]);
+
+  // When an API finishes after Save, enrich the stored field rather than saving only nulls.
+  useEffect(() => {
+    if (!activeFieldId || !selection || !data || Math.abs(data.point[0] - selection[0]) > 0.00011 || Math.abs(data.point[1] - selection[1]) > 0.00011) return;
+    updateFieldSnapshot(activeFieldId, { nasa: data });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, activeFieldId]);
+  useEffect(() => {
+    if (!activeFieldId || !selection || !weather || Math.abs(weather.point[0] - selection[0]) > 0.000011 || Math.abs(weather.point[1] - selection[1]) > 0.000011) return;
+    updateFieldSnapshot(activeFieldId, { weather });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weather, activeFieldId]);
+
+  useEffect(() => {
+    if (!searchFocused || searchTerm.trim().length < 2 || !HAS_MAP_KEY) { setSearchResults([]); setSearchLoading(false); return; }
     searchAbort.current?.abort();
     const ctrl = new AbortController();
     searchAbort.current = ctrl;
     const timer = window.setTimeout(async () => {
       setSearchLoading(true); setSearchError(null);
       try {
-        const params = new URLSearchParams({ q: searchTerm, access_token: TOKEN, autocomplete: 'true', limit: '5', language: 'en' });
-        const res = await fetch(`https://api.mapbox.com/search/geocode/v6/forward?${params}`, { signal: ctrl.signal });
+        const params = new URLSearchParams({ key: MAPTILER_KEY, limit: '5', language: 'en' });
+        const res = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(searchTerm.trim())}.json?${params}`, { signal: ctrl.signal });
         if (!res.ok) throw new Error(`Search unavailable (${res.status})`);
-        const json = await res.json() as { features?: Result[] };
-        setSearchResults(json.features ?? []);
+        const json = await res.json() as { features?: Array<{ geometry?: { coordinates?: number[] }; center?: number[]; text?: string; place_name?: string; properties?: { name?: string } }> };
+        const results: Result[] = (json.features ?? []).flatMap(feature => {
+          const coords = feature.center ?? feature.geometry?.coordinates;
+          if (!coords || coords.length < 2 || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return [];
+          return [{
+            geometry: { coordinates: [coords[0], coords[1]] as Coordinates },
+            properties: {
+              name: feature.text || feature.properties?.name || 'Location',
+              full_address: feature.place_name || feature.text || 'Location',
+              place_formatted: feature.place_name || ''
+            }
+          }];
+        });
+        setSearchResults(results);
       } catch (e) { if (!(e instanceof Error && e.name === 'AbortError')) setSearchError('Search is temporarily unavailable. You can click the map instead.'); }
       finally { if (!ctrl.signal.aborted) setSearchLoading(false); }
     }, 340);
@@ -105,7 +171,10 @@ export default function FieldShiftApp() {
   const previewStatus = statuses.find(s => s.id === previewId);
   const preview = previewId && previewStatus?.available && previewStatus.date ? { id: previewId, date: previewStatus.date } : null;
   const handleSelect = (coords: Coordinates, name?: string | null, fly = false) => {
+    setActiveFieldId(null);
     setSelection(coords);
+    setData(null);
+    setWeather(null);
     setPlaceLabel(name ?? null);
     setShowOverview(true);
     setSearchFocused(false);
@@ -116,9 +185,32 @@ export default function FieldShiftApp() {
     const status = statuses.find(item => item.id === id);
     if (layerError) { setToast('NASA imagery is temporarily unavailable. Try reloading the page.'); return; }
     if (layerManifest && !status?.available) { setToast(`${DATA_LAYERS[id].label}: NASA has not published an available imagery date.`); return; }
-    setEnabledLayers(v => v.includes(id) ? v.filter(x => x !== id) : [...v, id]);
+    // A single active layer avoids stacking opaque NASA raster images.
+    setEnabledLayers(v => v.includes(id) ? [] : [id]);
   };
-  const clearSelection = () => { setSelection(null); setPlaceLabel(null); setShowOverview(false); };
+  const clearSelection = () => { setSelection(null); setPlaceLabel(null); setActiveFieldId(null); setShowOverview(false); };
+  const loadField = (fieldId: string) => {
+    const field = fields.find(item => item.id === fieldId);
+    if (!field) return;
+    setActiveFieldId(field.id);
+    setSelection(field.point);
+    setRadius(field.radius);
+    setPlaceLabel(field.name);
+    setData(field.nasa);
+    setWeather(field.weather);
+    setShowOverview(true);
+    setFocus({ coords: field.point, nonce: Date.now() });
+    setSavedFieldsOpen(false);
+  };
+  const persistSelection = (name: string) => {
+    if (!selection) return;
+    const matched = fields.find(f => f.id === activeFieldId);
+    const result = saveField({ name, point: selection, radius, placeLabel, nasa: data, weather }, matched?.id);
+    if (result) setToast(`Saved “${result.name}” on this device.`);
+    else setToast('Could not save: browser storage is not ready.');
+  };
+  const activeSavedField = fields.find(f => f.id === activeFieldId);
+  const isSavedUnchanged = Boolean(activeSavedField && selection && activeSavedField.radius === radius && activeSavedField.point[0] === selection[0] && activeSavedField.point[1] === selection[1]);
   const zoom = (delta: number) => mapInstance?.easeTo({ zoom: mapInstance.getZoom() + delta, duration: 320 });
   const locate = () => {
     if (!navigator.geolocation) { setToast('Your browser does not support geolocation.'); return; }
@@ -131,9 +223,9 @@ export default function FieldShiftApp() {
 
   return <main className="relative h-[100dvh] min-h-[480px] w-full overflow-hidden bg-[#d1dfcd]">
     <div className="absolute inset-0 bg-[linear-gradient(135deg,#a9bda2_0%,#d3cda4_45%,#7d9e88_100%)]" />
-    {TOKEN && <MapCanvas token={TOKEN} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} showBounds={showBounds} />}
+    {HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
 
-    {/* Minimal navigation: intentionally no saved fields, crops or chat. */}
+    {/* Account-free saved fields: persisted locally, accessible to a future Crops page. */}
     <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[58px] flex-col items-center border-r border-[#ebefeb] bg-white/95 px-1 py-3 shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[64px]">
       <div className="group flex flex-col items-center gap-1" title="FieldShift">
         <div className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#225c44] text-white"><Leaf size={19} strokeWidth={1.8}/></div>
@@ -141,8 +233,7 @@ export default function FieldShiftApp() {
       </div>
       <div className="mt-7 flex w-full flex-col items-center gap-2">
         <button className="flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl bg-[#eef5ee] text-[#286048]" title="Explore" aria-current="page"><Map size={17}/><span className="text-[9px] font-semibold">Explore</span></button>
-        <button onClick={() => setLayersPanelOpen(v => !v)} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl transition-colors ${layersPanelOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Map layers" aria-expanded={layersPanelOpen}><Layers size={17}/><span className="text-[9px]">Layers</span></button>
-        <button onClick={() => { if (selection) setShowOverview(v => !v); else setToast('First click the map or search for a location.'); }} className="flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl text-[#8a9990] hover:bg-[#f7faf6]" title="Area overview"><Activity size={17}/><span className="text-[9px]">Overview</span></button>
+        <button onClick={() => setSavedFieldsOpen(v => !v)} className={`flex h-[57px] w-full flex-col items-center justify-center gap-1 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={17}/><span className="text-[9px]">Fields</span></button>
       </div>
       <div className="mt-auto flex flex-col items-center gap-2 pb-1">
         <button onClick={() => setHelpOpen(v => !v)} aria-label="How to use FieldShift" className="grid h-9 w-9 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={19}/></button>
@@ -188,12 +279,22 @@ export default function FieldShiftApp() {
     </header>
 
     {selection && showOverview && <aside className="absolute bottom-[76px] left-[69px] top-[131px] z-10 w-[min(329px,calc(100vw-84px))] md:bottom-[76px] md:left-[79px] md:top-[127px] md:w-[335px]">
-      <FieldOverview selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} showBounds={showBounds} onToggleBounds={setShowBounds} placeLabel={placeLabel} preview={preview}/>
+      <FieldOverview selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} weather={weather} weatherLoading={weatherLoading} weatherError={weatherError} weatherNotConfigured={weatherNotConfigured} placeLabel={placeLabel} preview={preview}/>
     </aside>}
 
     {selection && !showOverview && <button onClick={() => setShowOverview(true)} className="absolute left-[78px] top-[136px] z-10 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-[11px] font-semibold text-[#286048] shadow-float"><ChevronRight size={16}/> View area overview</button>}
 
-    {!selection && TOKEN && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 bg-white/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
+    {savedFieldsOpen && <div className="absolute bottom-[76px] left-[69px] top-[133px] z-20 w-[min(316px,calc(100vw-84px))] overflow-y-auto rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:left-[79px]">
+      <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-[#2b5038]">Saved fields</h3><button onClick={() => setSavedFieldsOpen(false)} aria-label="Close saved fields" className="text-[#869a8c]"><X size={17}/></button></div>
+      <p className="mt-1 text-[10px] text-[#93a297]">Stored on this device · {fields.length} fields</p>
+      {fields.length === 0 && <p className="mt-4 rounded-xl bg-[#f4f8f3] p-3 text-[11px] leading-relaxed text-[#7c8e80]">Select an area and use Save field in the overview. It will stay here even after you close the browser.</p>}
+      <div className="mt-3 space-y-2">{fields.map(field => <div key={field.id} className="flex items-center gap-2 rounded-xl border border-[#e6eee6] p-2">
+        <button onClick={() => loadField(field.id)} className="min-w-0 flex-1 p-1 text-left hover:text-[#236b48]"><strong className="block truncate text-[11px]">{field.name}</strong><small className="block text-[9px] text-[#90a095]">{field.point[1].toFixed(4)}, {field.point[0].toFixed(4)} · {field.radius} m</small><small className="block text-[9px] text-[#8da093]">{field.nasa ? 'NASA saved' : 'NASA pending'} · {field.weather ? 'Weather saved' : 'Weather pending'}</small></button>
+        <button onClick={() => { deleteField(field.id); if (field.id === activeFieldId) clearSelection(); }} aria-label={`Delete ${field.name}`} title="Delete saved field" className="rounded-lg p-2 text-[#a3aaa3] hover:bg-red-50 hover:text-red-600"><Trash2 size={15}/></button>
+      </div>)}</div>
+    </div>}
+
+    {!selection && HAS_MAP_KEY && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 bg-white/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
       <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#e6f4e7] text-[#397a55]"><MapPin size={19}/></div>
       <p className="mt-2 text-[13px] font-bold text-[#2b4d3b]">Explore any area on Earth</p>
       <p className="mt-1 text-[11px] leading-relaxed text-[#859488]">Click the map to drop a pin and explore real NASA Earth data for that location.</p>
@@ -208,7 +309,7 @@ export default function FieldShiftApp() {
       </div>}
       <button onClick={() => setStylePickerOpen(v => !v)} aria-expanded={stylePickerOpen} className="flex h-[49px] items-center gap-3 rounded-xl bg-white p-1.5 pr-4 shadow-float">
         <span className={`h-[37px] w-[37px] rounded-lg border border-white/70 ${styleId === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : styleId === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : styleId === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />
-        <span className="text-left"><strong className="block text-[11px] leading-tight">{BASE_STYLES[styleId].name}</strong><small className="block text-[9px] text-[#a5b0a7]">Base map</small></span>
+        <span className="text-left"><strong className="block text-[11px] leading-tight">{BASE_STYLES[styleId].name}</strong><small className="block text-[9px] text-[#a5b0a7]">{styleId === 'satellite' ? 'MapTiler imagery' : 'MapTiler basemap'}</small></span>
         <Layers size={17} className="ml-1 text-[#487e5b]"/>
       </button>
     </div>
@@ -235,25 +336,25 @@ export default function FieldShiftApp() {
         </button>;
       })}</div>
       {layerError && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[10px] text-amber-700">{layerError}</p>}
-      <p className="mt-3 border-t border-[#e9efea] pt-3 text-[10px] leading-relaxed text-[#859488]">Imagery dates are retrieved from NASA. Wind here is a <strong>monthly historical layer</strong>, not a live wind forecast. Overlays can look coarse at field zoom.</p>
+      <p className="mt-3 border-t border-[#e9efea] pt-3 text-[10px] leading-relaxed text-[#859488]">One NASA map layer at a time. Wind imagery is historical; current forecast values appear in the Meteomatics overview.</p>
     </div>}
 
     {helpOpen && <div className="absolute bottom-6 left-[70px] z-30 w-[min(325px,calc(100vw-85px))] rounded-card bg-white p-5 shadow-float md:left-[80px]">
       <button onClick={() => setHelpOpen(false)} aria-label="Close help" className="absolute right-3 top-3 text-[#92a095]"><X size={17}/></button>
       <h3 className="text-[15px] font-bold">How FieldShift works</h3>
       <ol className="mt-3 list-inside list-decimal space-y-2 text-[11px] leading-relaxed text-[#697f70]">
-        <li>Click the map or search for a place.</li><li>Drag the green pin to adjust the center.</li><li>Change the radius to grow or shrink the selected area.</li><li>Use the NASA layer chips for satellite and modeled imagery.</li><li>View dated NASA observations in the overview.</li>
+        <li>Click the map or search for a place.</li><li>Drag the green pin to adjust the center.</li><li>Change the radius to grow or shrink the selected area.</li><li>Use one NASA layer at a time.</li><li>Save the field locally to reuse it later.</li>
       </ol>
-      <p className="mt-3 rounded-lg bg-[#f1f6ef] p-2 text-[10px] text-[#65816a]">No account. Your selection stays only in this tab; nothing is saved.</p>
+      <p className="mt-3 rounded-lg bg-[#f1f6ef] p-2 text-[10px] text-[#65816a]">No account needed. Saved fields, NASA snapshots, and forecast snapshots stay in your browser's local storage.</p>
     </div>}
 
-    {!TOKEN && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white bg-white p-7 shadow-float">
+    {!HAS_MAP_KEY && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white bg-white p-7 shadow-float">
       <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f3e7] text-[#286347]"><Map size={23}/></div>
-      <h2 className="text-[19px] font-bold tracking-tight">Connect your Mapbox map</h2>
-      <p className="mt-2 text-[12px] leading-relaxed text-[#6b8070]">The Next.js project is ready, but Mapbox needs your public token to display the map. NASA POWER and GIBS do not require API keys.</p>
-      <code className="mt-4 block break-all rounded-lg bg-[#f0f4ef] p-3 text-[11px] text-[#245d42]">NEXT_PUBLIC_MAPBOX_TOKEN=pk.your_token_here</code>
+      <h2 className="text-[19px] font-bold tracking-tight">Connect your MapTiler map</h2>
+      <p className="mt-2 text-[12px] leading-relaxed text-[#6b8070]">The Next.js project is ready, but MapTiler needs your API key to display the map. NASA POWER and GIBS do not require API keys.</p>
+      <code className="mt-4 block break-all rounded-lg bg-[#f0f4ef] p-3 text-[11px] text-[#245d42]">NEXT_PUBLIC_MAPTILER_KEY=your_maptiler_key_here</code>
       <p className="mt-2 text-[10px] text-[#809183]">Save this in <strong>.env.local</strong> and restart the development server.</p>
-      <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1 text-[11px] font-bold text-[#286849] hover:underline">Get a Mapbox access token <ExternalLink size={12}/></a>
+      <a href="https://cloud.maptiler.com/account/keys/" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1 text-[11px] font-bold text-[#286849] hover:underline">Get a MapTiler API key <ExternalLink size={12}/></a>
     </div>}
 
     {toast && <div role="status" className="absolute bottom-[88px] right-4 z-30 flex max-w-[300px] items-start gap-3 rounded-xl bg-[#20523e] px-4 py-3 text-[11px] leading-relaxed text-white shadow-float md:right-6"><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Dismiss message" className="mt-0.5 shrink-0 text-white/80 hover:text-white"><X size={15}/></button></div>}

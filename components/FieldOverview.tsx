@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownToLine, ChevronDown, CircleHelp, CloudRain, Compass, Droplets, ExternalLink, Info, Leaf, MapPin, RefreshCw, Sun, Thermometer, Wind, X } from 'lucide-react';
-import type { Coordinates, LayerId, Measurement, OverviewData } from '@/lib/types';
+import { Activity, ChevronDown, CircleHelp, CloudRain, CloudSun, Droplets, ExternalLink, Leaf, MapPin, RefreshCw, Save, Sun, Thermometer, Wind, X } from 'lucide-react';
+import type { Coordinates, LayerId, Measurement, OverviewData, WeatherData } from '@/lib/types';
 import { DATA_LAYERS } from '@/lib/layers';
 import { areaHectares, boundingSquare } from '@/lib/geo.mjs';
 
@@ -11,12 +11,18 @@ type Props = {
   radius: number;
   onRadius: (n: number) => void;
   onClear: () => void;
+  onClose: () => void;
+  onSave: (name: string) => void;
+  saved: boolean;
+  initialName: string;
   onRefresh: () => void;
   data: OverviewData | null;
   loading: boolean;
   error: string | null;
-  showBounds: boolean;
-  onToggleBounds: (value: boolean) => void;
+  weather: WeatherData | null;
+  weatherLoading: boolean;
+  weatherError: string | null;
+  weatherNotConfigured: boolean;
   placeLabel: string | null;
   preview: { id: LayerId; date: string } | null;
 };
@@ -58,7 +64,7 @@ function TrendChart({ data }: { data: OverviewData | null }) {
     return {
       path: points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' '),
       fill: `${points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' ')} L 269 73 L 1 73 Z`,
-      title: key === 'soilWetness' ? 'Surface soil wetness' : 'Air temperature',
+      title: key === 'soilWetness' ? (data?.soilLabel ?? 'Surface soil wetness') : 'Air temperature',
       dateFrom: rows[0].date, dateTo: rows.at(-1)?.date ?? rows[0].date,
       unit: key === 'soilWetness' ? '%' : '°C'
     };
@@ -82,31 +88,33 @@ function TrendChart({ data }: { data: OverviewData | null }) {
   </section>;
 }
 
-export default function FieldOverview({ selection, radius, onRadius, onClear, onRefresh, data, loading, error, showBounds, onToggleBounds, placeLabel, preview }: Props) {
-  const [copied, setCopied] = useState(false);
+export default function FieldOverview({ selection, radius, onRadius, onClear, onClose, onSave, saved, initialName, onRefresh, data, loading, error, weather, weatherLoading, weatherError, weatherNotConfigured, placeLabel, preview }: Props) {
+  const [fieldName, setFieldName] = useState(initialName);
+  useEffect(() => setFieldName(initialName), [initialName]);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [west, south, east, north] = boundingSquare(selection, radius);
-  const bbox = [west, south, east, north].map(v => v.toFixed(6)).join(', ');
   const area = areaHectares(radius);
   const imageryUrl = preview ? `/api/nasa/region-image?${new URLSearchParams({ layer: preview.id, date: preview.date, west: west.toFixed(6), south: south.toFixed(6), east: east.toFixed(6), north: north.toFixed(6) })}` : null;
   useEffect(() => { setImageError(false); }, [imageryUrl]);
-  const onCopy = async () => {
-    try { await navigator.clipboard.writeText(`${west.toFixed(6)},${south.toFixed(6)},${east.toFixed(6)},${north.toFixed(6)}`); setCopied(true); window.setTimeout(() => setCopied(false), 1800); }
-    catch { setCopied(false); }
-  };
+
 
   return <div className="soft-scroll flex h-full max-h-full flex-col overflow-y-auto rounded-card border border-[#e5eee4] bg-white shadow-float">
     <div className="px-[19px] pb-5 pt-5">
       <div className="flex items-start justify-between">
         <span className="text-[10px] font-bold uppercase tracking-[.10em] text-[#8a9c90]">Area overview</span>
-        <button onClick={onClear} aria-label="Clear selected area" className="rounded-md p-1 text-[#9aa69d] hover:bg-[#eef5ed] hover:text-[#255b43]"><X size={17}/></button>
+        <button onClick={onClose} aria-label="Close overview" className="rounded-md p-1 text-[#9aa69d] hover:bg-[#eef5ed] hover:text-[#255b43]"><X size={17}/></button>
       </div>
       <h2 className="mt-1 text-[24px] font-bold tracking-[-.055em] text-[#2b4135]">{placeLabel || 'Selected area'}</h2>
       <p className="mt-1 flex items-center gap-1 text-[11px] text-[#8d9c92]"><MapPin className="h-3 w-3"/> {selection[1].toFixed(5)}, {selection[0].toFixed(5)}</p>
       <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px]">
-        <span className="rounded-md bg-[#e9f4eb] px-2 py-1 font-semibold text-[#34724c]">● Temporary selection</span>
+        <span className="rounded-md bg-[#e9f4eb] px-2 py-1 font-semibold text-[#34724c]">● {saved ? 'Saved field' : 'Unsaved selection'}</span>
         <span className="text-[#839488]">{area >= 100 ? Math.round(area).toLocaleString() : area.toFixed(1)} ha circle</span>
+      </div>
+      <div className="mt-4 space-y-2">
+        <label htmlFor="field-name" className="block text-[11px] font-semibold text-[#476451]">Field name</label>
+        <input id="field-name" value={fieldName} maxLength={80} onChange={e => setFieldName(e.target.value)} className="w-full rounded-xl border border-[#dfebe0] px-3 py-2 text-[12px] outline-none focus:border-[#4b9564]" placeholder="My field" />
+        <button onClick={() => onSave(fieldName.trim() || 'My field')} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#286649] px-3 py-2.5 text-[12px] font-bold text-white hover:bg-[#21583d]"><Save size={15}/>{saved ? 'Update saved field' : 'Save field to this device'}</button>
       </div>
 
       <div className="mt-5 flex items-center justify-between">
@@ -115,13 +123,6 @@ export default function FieldOverview({ selection, radius, onRadius, onClear, on
       </div>
       <input id="field-radius" type="range" min={25} max={5000} step={25} value={radius} onChange={e => onRadius(Number(e.target.value))} className="mt-3 h-1.5 w-full cursor-pointer" aria-label="Selection radius in meters" />
       <div className="mt-1 flex justify-between text-[9px] text-[#a1ada4]"><span>25 m</span><span>5 km</span></div>
-      <div className="mt-3 flex items-center justify-between rounded-xl bg-[#f4f7f3] px-3 py-3">
-        <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#4f8366]"><Compass size={15}/></span><div><p className="text-[11px] font-semibold">API bounding box</p><p className="text-[9px] text-[#8c9a8f]">Square around the pin</p></div></div>
-        <button type="button" onClick={() => onToggleBounds(!showBounds)} aria-label="Show or hide bounding box" aria-pressed={showBounds} className="switch" data-on={showBounds} />
-      </div>
-      <button onClick={onCopy} className="mt-2 flex w-full items-center justify-between rounded-lg border border-[#e3ebe3] px-3 py-2 text-[10.5px] text-[#536e5e] hover:bg-[#f4f9f3]"><span className="truncate pr-2 font-mono">{bbox}</span><span className="flex shrink-0 items-center gap-1 font-semibold"><ArrowDownToLine size={13}/>{copied ? 'Copied' : 'Copy'}</span></button>
-      <p className="mt-1 text-[9px] text-[#96a398]">Coordinates: west, south, east, north · WGS84</p>
-
       <div className="mt-5 border-t border-[#e9eee9] pt-4">
         <div className="flex items-center justify-between gap-1">
           <h3 className="text-[13px] font-bold">NASA observations</h3>
@@ -135,35 +136,55 @@ export default function FieldOverview({ selection, radius, onRadius, onClear, on
           <Metric title="Air humidity" measurement={data?.humidity} icon={<Droplets size={15}/>} tone="text-sky-500" digits={0} />
           <Metric title="Rainfall · 7 days" measurement={data?.rainfallSevenDays} icon={<CloudRain size={15}/>} tone="text-blue-500" note={data?.rainfallSevenDays.value !== null && data?.rainfallSevenDays.value !== undefined ? `${data.rainfallSevenDays.daysAvailable}/7 days · through ${dateShort(data.rainfallSevenDays.end)}` : undefined} />
           <Metric title="Wind speed · 2 m" measurement={data?.windSpeed} icon={<Wind size={15}/>} tone="text-teal-600" />
-          <Metric title="Surface soil wetness" measurement={data?.soilWetness} icon={<Leaf size={15}/>} tone="text-emerald-600" digits={0}/>
+          <Metric title={data?.soilLabel ?? 'Surface soil wetness'} measurement={data?.soilWetness} icon={<Leaf size={15}/>} tone="text-emerald-600" note={data?.soilWetness?.value === null ? 'No valid NASA observation' : undefined} digits={0}/>
           <Metric title="Solar energy" measurement={data?.solarRadiation} icon={<Sun size={15}/>} tone="text-amber-500"/>
         </div>
-        {data?.soilWetness.value !== null && data?.soilWetness.value !== undefined && <p className="mt-2 text-[10px] leading-relaxed text-[#8b9a8d]">Soil value is NASA POWER modeled wetness (0–100% relative fraction), not a field sensor reading.</p>}
+        {data?.soilNote && <p className="mt-2 text-[10px] leading-relaxed text-[#8b9a8d]">{data.soilNote}</p>}
       </div>
+      <section className="mt-5 border-t border-[#e9eee9] pt-4">
+        <div className="flex items-center justify-between gap-2"><h3 className="text-[13px] font-bold">Weather forecast</h3><span className="flex items-center gap-1 rounded-lg bg-[#ecf5ef] px-2 py-1 text-[9px] font-semibold text-[#34724c]"><CloudSun size={13}/> Meteomatics</span></div>
+        {weatherLoading && <p className="mt-2 text-[10px] text-[#819287]">Loading forecast…</p>}
+        {weatherNotConfigured && <p className="mt-2 rounded-xl bg-[#f4f6f1] p-3 text-[10px] leading-relaxed text-[#76877b]">Forecast is ready to connect. Add your Meteomatics credentials to the server's .env.local file.</p>}
+        {weatherError && <p className="mt-2 rounded-xl bg-amber-50 p-3 text-[10px] text-amber-800">{weatherError}</p>}
+        {weather && weather.forecast.length > 0 && (() => {
+          const forecast = weather.forecast;
+          // Use the earliest valid Meteomatics forecast step; do not call it a live sensor observation.
+          const first = forecast[0];
+          const fmt = (v: number | null, unit: string) => v === null ? '—' : `${Number(v.toFixed(1))} ${unit}`;
+          return <>
+            <p className="mt-1 text-[10px] text-[#8e9e92]">Forecast valid {new Date(first.time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-[#f5f9f6] p-3"><p className="text-[10px] text-[#788b7d]">Temperature</p><strong className="mt-2 block text-[17px] text-[#315940]">{fmt(first.temperature, '°C')}</strong></div>
+              <div className="rounded-xl bg-[#f5f9f6] p-3"><p className="text-[10px] text-[#788b7d]">Humidity</p><strong className="mt-2 block text-[17px] text-[#315940]">{fmt(first.humidity, '%')}</strong></div>
+              <div className="rounded-xl bg-[#f5f9f6] p-3"><p className="text-[10px] text-[#788b7d]">Wind at 10 m</p><strong className="mt-2 block text-[17px] text-[#315940]">{fmt(first.windSpeed, 'm/s')}</strong></div>
+              <div className="rounded-xl bg-[#f5f9f6] p-3"><p className="text-[10px] text-[#788b7d]">Rain in preceding 1 h</p><strong className="mt-2 block text-[17px] text-[#315940]">{fmt(first.precipitationPreviousHour, 'mm')}</strong></div>
+            </div>
+            <p className="mt-2 text-[9px] text-[#8e9e92]">Model forecast for this area · refreshed when selecting a field</p>
+          </>;
+        })()}
+      </section>
       <TrendChart data={data}/>
       {preview && imageryUrl && <section className="mt-5 border-t border-[#e9eee9] pt-4">
-        <div className="flex items-center justify-between"><h3 className="text-[12px] font-semibold">Your square · NASA image</h3><span className="rounded-md bg-[#edf5ed] px-2 py-1 text-[9px] font-semibold text-[#447a58]">GIBS WMS</span></div>
+        <div className="flex items-center justify-between"><h3 className="text-[12px] font-semibold">NASA area imagery</h3><span className="rounded-md bg-[#edf5ed] px-2 py-1 text-[9px] font-semibold text-[#447a58]">GIBS WMS</span></div>
         <p className="mt-1 text-[10px] text-[#8b9d91]">{DATA_LAYERS[preview.id].label} · {dateShort(preview.date)}</p>
         {imageError ? <p className="mt-2 rounded-xl bg-[#f5f7f3] px-3 py-7 text-center text-[10px] text-[#86988b]">NASA has no available image for this area and date.</p> :
           <div className="mt-2 overflow-hidden rounded-xl border border-[#e5ebe4] bg-[#f0f3ec]">
             <img key={imageryUrl} src={imageryUrl} onLoad={() => setImageError(false)} onError={() => setImageError(true)} className="h-[158px] w-full object-cover" alt={`NASA ${DATA_LAYERS[preview.id].label} satellite/model imagery cropped to the square bounds`} />
           </div>}
-        <p className="mt-2 text-[9.5px] leading-relaxed text-[#8c9b8f]">This image is requested from NASA using the square's four coordinates. Coverage can be blank or coarse at field scale; it is not a measured field average.</p>
+        <p className="mt-2 text-[9.5px] leading-relaxed text-[#8c9b8f]">Satellite data for the selected area, where available.</p>
       </section>}
 
-      <div className="mt-4 rounded-xl border border-[#ece8d9] bg-[#fbf8ed] p-3">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#8a703e]"><Info size={14}/> About these measurements</div>
-        <p className="mt-1 text-[10.5px] leading-[1.55] text-[#95835c]">These are real NASA regional observations, not real-time weather forecasts or measurements of an individual field. Data dates and spatial resolution vary by product.</p>
-      </div>
-      <button onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen} className="mt-4 flex w-full items-center justify-between border-b border-[#e9efea] pb-2 text-left text-[11px] font-semibold"><span className="flex items-center gap-2"><CircleHelp size={14}/> Data sources & limitations</span><ChevronDown size={14} className={detailsOpen ? 'rotate-180' : ''}/></button>
+      <button onClick={() => setDetailsOpen(v => !v)} aria-expanded={detailsOpen} className="mt-4 flex w-full items-center justify-between border-b border-[#e9efea] pb-2 text-left text-[11px] font-semibold"><span className="flex items-center gap-2"><CircleHelp size={14}/> About data sources</span><ChevronDown size={14} className={detailsOpen ? 'rotate-180' : ''}/></button>
       {detailsOpen && <div className="space-y-2 pt-3 text-[10px] leading-relaxed text-[#7e8f82]">
         <p><strong>NASA POWER:</strong> daily gridded data sampled at a nearby ~0.5° point derived from the pin, not averaged across the circle.</p>
-        <p><strong>NASA GIBS:</strong> map layers use WMS satellite/model imagery. The square is sent to NASA GIBS for the cropped preview when an overlay is enabled. It does not average NASA observations across the area.</p>
+        <p><strong>NASA GIBS:</strong> dated satellite/model visualizations for the selected location. Imagery is not an individual-field measurement.</p>
+        <p><strong>Meteomatics:</strong> area weather forecast, separate from NASA historical observations.</p>
         <p><strong>Vegetation:</strong> MODIS NDVI is a map visualization, not a field health score.</p>
         <a className="inline-flex items-center gap-1 font-semibold text-[#27694c] hover:underline" href="https://power.larc.nasa.gov/" target="_blank" rel="noopener noreferrer">NASA POWER <ExternalLink size={11}/></a>
         <span className="mx-2">·</span>
         <a className="inline-flex items-center gap-1 font-semibold text-[#27694c] hover:underline" href="https://www.earthdata.nasa.gov/data/tools/gibs" target="_blank" rel="noopener noreferrer">NASA Earthdata <ExternalLink size={11}/></a>
       </div>}
+      <button onClick={onClear} className="mt-5 text-[10px] font-semibold text-[#87978c] hover:text-red-600">Clear selection from map</button>
     </div>
   </div>;
 }

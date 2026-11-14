@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
+import maplibregl from 'maplibre-gl';
 import type { Feature, Polygon } from 'geojson';
-import { BASE_STYLES, DATA_LAYERS, LAYER_IDS, nasaWmsTileUrl } from '@/lib/layers';
+import { DATA_LAYERS, LAYER_IDS, nasaWmsTileUrl, resolveBasemap } from '@/lib/layers';
 import type { Coordinates, LayerId, LayerStatus, MapStyleId } from '@/lib/types';
-import { boundingSquare, circlePolygon, squarePolygon } from '@/lib/geo.mjs';
+import { circlePolygon } from '@/lib/geo.mjs';
 
 type Props = {
-  token: string;
+  maptilerKey: string;
   selection: Coordinates | null;
   radius: number;
   styleId: MapStyleId;
@@ -16,17 +16,16 @@ type Props = {
   layerStatuses: LayerStatus[];
   onSelect: (coords: Coordinates) => void;
   focus: { coords: Coordinates; nonce: number } | null;
-  onReady?: (map: mapboxgl.Map | null) => void;
-  showBounds: boolean;
+  onReady?: (map: maplibregl.Map | null) => void;
 };
 
 const CENTER: Coordinates = [20.995, 42.009];
 const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
-export default function MapCanvas({ token, selection, radius, styleId, enabledLayers, layerStatuses, onSelect, focus, onReady, showBounds }: Props) {
+export default function MapCanvas({ maptilerKey, selection, radius, styleId, enabledLayers, layerStatuses, onSelect, focus, onReady }: Props) {
   const container = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markerRef = useRef<maplibregl.Marker | null>(null);
   const onSelectRef = useRef(onSelect);
   const onReadyRef = useRef(onReady);
   const [styleVersion, setStyleVersion] = useState(0);
@@ -34,39 +33,39 @@ export default function MapCanvas({ token, selection, radius, styleId, enabledLa
   onReadyRef.current = onReady;
 
   useEffect(() => {
-    if (!token || !container.current) return;
-    mapboxgl.accessToken = token;
-    const map = new mapboxgl.Map({
+    if (!maptilerKey || !container.current) return;
+    const map = new maplibregl.Map({
       container: container.current,
-      style: BASE_STYLES.satellite.url,
+      style: resolveBasemap('satellite', maptilerKey),
       center: CENTER,
-      zoom: 13.5,
-      pitch: 49,
-      bearing: -12,
+      zoom: 15.5,
+      pitch: 0,
+      bearing: 0,
       antialias: true,
       attributionControl: false,
       preserveDrawingBuffer: false
     });
     mapRef.current = map;
-    map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+    map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
     map.dragRotate.enable();
     map.touchZoomRotate.enable();
 
     const onStyleLoad = () => {
       // Style switches destroy custom sources/layers, so reconstruct the selection.
       map.addSource('selection-circle', { type: 'geojson', data: empty() });
-      map.addSource('selection-square', { type: 'geojson', data: empty() });
       map.addLayer({ id: 'selection-fill', type: 'fill', source: 'selection-circle',
         paint: { 'fill-color': '#9be18a', 'fill-opacity': 0.21 } });
       map.addLayer({ id: 'selection-outline', type: 'line', source: 'selection-circle',
         paint: { 'line-color': '#cdf9a9', 'line-width': 2.7, 'line-opacity': .99 } });
-      map.addLayer({ id: 'selection-square-line', type: 'line', source: 'selection-square',
-        paint: { 'line-color': '#fffdfa', 'line-width': 1.8, 'line-opacity': .94, 'line-dasharray': [2.2, 1.6] } });
       setStyleVersion(v => v + 1);
     };
     map.on('style.load', onStyleLoad);
     map.on('click', event => {
       onSelectRef.current([event.lngLat.lng, event.lngLat.lat]);
+    });
+    map.on('error', event => {
+      // Missing/expired/blocked keys become obvious in DevTools instead of a blank map.
+      console.error('[FieldShift] MapTiler/MapLibre error:', event.error);
     });
     map.on('load', () => onReadyRef.current?.(map));
     const onResize = () => map.resize();
@@ -79,38 +78,34 @@ export default function MapCanvas({ token, selection, radius, styleId, enabledLa
       map.remove();
       mapRef.current = null;
     };
-  }, [token]);
+  }, [maptilerKey]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) {
-      const nextStyle = BASE_STYLES[styleId].url;
+      const nextStyle = resolveBasemap(styleId, maptilerKey);
       // map.getStyle().sprite is not used as a style ID; avoid redundant reloads via a ref below.
       if (mapStyleRef.current !== styleId) {
         mapStyleRef.current = styleId;
         map.setStyle(nextStyle);
       }
     }
-  }, [styleId, styleVersion]);
+  }, [styleId, styleVersion, maptilerKey]);
 
   const mapStyleRef = useRef<MapStyleId>('satellite');
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    const circleSource = map.getSource('selection-circle') as mapboxgl.GeoJSONSource | undefined;
-    const squareSource = map.getSource('selection-square') as mapboxgl.GeoJSONSource | undefined;
-    if (!circleSource || !squareSource) return;
+    const circleSource = map.getSource('selection-circle') as maplibregl.GeoJSONSource | undefined;
+    if (!circleSource) return;
     let circ: GeoJSON.FeatureCollection = empty();
-    let square: GeoJSON.FeatureCollection = empty();
     if (selection) {
       try {
         circ = { type: 'FeatureCollection', features: [circlePolygon(selection, radius) as Feature<Polygon>] };
-        if (showBounds) square = { type: 'FeatureCollection', features: [squarePolygon(boundingSquare(selection, radius)) as Feature<Polygon>] };
       } catch { /* Antimeridian or invalid coordinate: keep selection only. */ }
     }
     circleSource.setData(circ);
-    squareSource.setData(square);
     if (selection) {
       if (!markerRef.current) {
         const markerElement = document.createElement('div');
@@ -118,7 +113,7 @@ export default function MapCanvas({ token, selection, radius, styleId, enabledLa
         markerElement.setAttribute('aria-label', 'Drag selected location');
         markerElement.innerHTML = `<span class="map-pin-inner"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s7-4.7 7-11a7 7 0 1 0-14 0c0 6.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>`;
         markerElement.addEventListener('click', event => event.stopPropagation());
-        const marker = new mapboxgl.Marker({ element: markerElement, draggable: true, anchor: 'bottom' }).setLngLat(selection).addTo(map);
+        const marker = new maplibregl.Marker({ element: markerElement, draggable: true, anchor: 'bottom' }).setLngLat(selection).addTo(map);
         marker.on('dragend', () => {
           const p = marker.getLngLat();
           onSelectRef.current([p.lng, p.lat]);
@@ -131,7 +126,7 @@ export default function MapCanvas({ token, selection, radius, styleId, enabledLa
       markerRef.current?.remove();
       markerRef.current = null;
     }
-  }, [selection, radius, showBounds, styleVersion]);
+  }, [selection, radius, styleVersion]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -163,5 +158,5 @@ export default function MapCanvas({ token, selection, radius, styleId, enabledLa
     mapRef.current?.flyTo({ center: focus.coords, zoom: Math.max(mapRef.current.getZoom(), 13.6), speed: 1.2, essential: true });
   }, [focus]);
 
-  return <div ref={container} className="absolute inset-0" aria-label="Interactive Mapbox map. Click to select a field location." />;
+  return <div ref={container} className="absolute inset-0" aria-label="Interactive MapTiler satellite map. Click to select a field location." />;
 }

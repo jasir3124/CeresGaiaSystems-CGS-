@@ -40,6 +40,14 @@ function latest(data: Record<string, Record<string, number>>, key: string, unit:
 function numberOrNull(series: Record<string, number> | undefined, date: string) {
   const v = series?.[date]; return valid(v) ? v : null;
 }
+function latestSoil(data: Record<string, Record<string, number>>, key: string): Measurement {
+  const dates = Object.keys(data[key] ?? {}).sort().reverse();
+  for (const date of dates) {
+    const value = data[key]?.[date];
+    if (valid(value) && value >= 0 && value <= 1) return { value: value * 100, date: readable(date), unit: '%' };
+  }
+  return { value: null, date: null, unit: '%' };
+}
 
 export async function GET(request: NextRequest) {
   const latitude = Number(request.nextUrl.searchParams.get('lat'));
@@ -60,9 +68,31 @@ export async function GET(request: NextRequest) {
   const end = ymd(new Date(Date.now() - DAY * 3));
   const start = ymd(new Date(Date.now() - DAY * 95));
   try {
-    const ag = await loadPower(sampledLatitude, sampledLongitude, start, end, 'AG', AG_PARAMS);
-    // The HY community explicitly exposes GWETTOP; failures here do not suppress weather.
-    const hy = await loadPower(sampledLatitude, sampledLongitude, start, end, 'HY', ['GWETTOP']).catch(() => ({} as Record<string, Record<string, number>>));
+    const agPromise = loadPower(sampledLatitude, sampledLongitude, start, end, 'AG', AG_PARAMS);
+    // Hydrology data can lag meteorology. Query a longer period, and retry with
+    // NASA POWER's distinct volumetric surface-moisture series if wetness is absent.
+    const hyStart = ymd(new Date(Date.now() - DAY * 370));
+    const hyEnd = ymd(new Date(Date.now() - DAY * 3));
+    let hydrologyError: string | null = null;
+    let soilSource: 'GWETTOP' | 'SFMC' | null = null;
+    let hy: Record<string, Record<string, number>> = {};
+    try {
+      hy = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'HY', ['GWETTOP']);
+      if (Object.values(hy.GWETTOP ?? {}).some(v => valid(v) && v >= 0 && v <= 1)) soilSource = 'GWETTOP';
+    } catch (error) { hydrologyError = error instanceof Error ? error.message : 'NASA hydrology unavailable'; }
+    if (!soilSource) {
+      try {
+        const alternate = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'HY', ['SFMC']);
+        if (Object.values(alternate.SFMC ?? {}).some(v => valid(v) && v >= 0 && v <= 1)) {
+          hy = alternate;
+          soilSource = 'SFMC';
+          hydrologyError = null;
+        }
+      } catch (error) {
+        hydrologyError = error instanceof Error ? error.message : 'NASA surface moisture unavailable';
+      }
+    }
+    const ag = await agPromise;
     const temperature = latest(ag, 'T2M', '°C');
     const humidityRaw = latest(ag, 'RH2M', '%');
     // Most POWER RH2M responses return percentage values; protect against
@@ -71,8 +101,13 @@ export async function GET(request: NextRequest) {
     const windSpeed = latest(ag, 'WS2M', 'm/s');
     const windDirection = latest(ag, 'WD2M', '°');
     const solarRadiation = latest(ag, 'ALLSKY_SFC_SW_DWN', 'MJ/m²/day');
-    const soilRaw = latest(hy, 'GWETTOP', 'fraction');
-    const soilWetness = { ...soilRaw, value: soilRaw.value !== null && soilRaw.value >= 0 && soilRaw.value <= 1 ? soilRaw.value * 100 : null, unit: '%' };
+    const soilWetness = latestSoil(hy, soilSource ?? 'GWETTOP');
+    const soilLabel = soilSource === 'SFMC' ? 'Surface soil moisture' : 'Surface soil wetness';
+    const soilNote = soilSource === 'SFMC'
+      ? 'NASA POWER SFMC: modeled volumetric water content (m³/m³), shown as volume percent.'
+      : soilSource === 'GWETTOP'
+        ? 'NASA POWER GWETTOP: modeled soil wetness fraction, shown as a percentage.'
+        : `No valid NASA soil observation is available for this area and time. ${hydrologyError ?? 'Both GWETTOP and SFMC returned no valid values.'}`;
 
     const rainKeys = Object.keys(ag.PRECTOTCORR ?? {}).filter(key => numberOrNull(ag.PRECTOTCORR, key) !== null).sort();
     const latestRainDate = rainKeys.at(-1) ?? null;
@@ -88,19 +123,19 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const allKeys = Array.from(new Set([...Object.keys(ag.T2M ?? {}), ...Object.keys(ag.PRECTOTCORR ?? {}), ...Object.keys(hy.GWETTOP ?? {})])).sort().slice(-30);
+    const allKeys = Array.from(new Set([...Object.keys(ag.T2M ?? {}), ...Object.keys(ag.PRECTOTCORR ?? {}), ...Object.keys(hy[soilSource ?? 'GWETTOP'] ?? {})])).sort().slice(-30);
     const daily: DailyRow[] = allKeys.map(date => ({
       date: readable(date),
       temperature: numberOrNull(ag.T2M, date),
       precipitation: numberOrNull(ag.PRECTOTCORR, date),
-      soilWetness: (() => { const v = numberOrNull(hy.GWETTOP, date); return v !== null && v >= 0 && v <= 1 ? v * 100 : null; })()
+      soilWetness: (() => { const v = numberOrNull(hy[soilSource ?? 'GWETTOP'], date); return v !== null && v >= 0 && v <= 1 ? v * 100 : null; })()
     }));
 
     const result: OverviewData = {
       point: [longitude, latitude], sampledPoint: [sampledLongitude, sampledLatitude], latestWeatherDate: temperature.date,
-      temperature, humidity, windSpeed, windDirection, soilWetness, solarRadiation,
+      temperature, humidity, windSpeed, windDirection, soilWetness, soilLabel, soilNote, soilSource, solarRadiation,
       rainfallSevenDays, daily,
-      note: 'POWER values are requested at a nearby ~0.5° grid point, not a sensor inside the selected field. Soil wetness is a modeled fraction, not in-situ soil water content. Observation dates can lag real time.',
+      note: 'NASA POWER regional modeled values, with individual observation dates.',
       source: 'NASA POWER · AG and HY daily point APIs (UTC)'
     };
     return NextResponse.json(result, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=14400, stale-while-revalidate=3600' } });
