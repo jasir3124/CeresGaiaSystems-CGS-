@@ -33,7 +33,7 @@ export default function MapCanvas({ maptilerKey, selection, radius, styleId, ena
   onReadyRef.current = onReady;
 
   useEffect(() => {
-    if (!maptilerKey || !container.current) return;
+    if (!navigator.onLine || !maptilerKey || !container.current) return;
     const map = new maplibregl.Map({
       container: container.current,
       style: resolveBasemap('satellite', maptilerKey),

@@ -8,6 +8,8 @@ import { MessageCircle, Sprout, Save, Trash2, ArrowRight, ChevronDown, ChevronLe
 import FieldOverview from './FieldOverview';
 import FieldDataDetails from './FieldDataDetails';
 import ThemeToggle from './ThemeToggle';
+import PwaControls from './PwaControls';
+import { useOnline } from '@/lib/use-online';
 import FieldChat from './FieldChat';
 import CropsModal from './CropsModal';
 import Recommendations from './Recommendations';
@@ -36,6 +38,7 @@ function fmtDate(value: string | null) {
 }
 
 export default function FieldShiftApp() {
+  const online = useOnline();
   const [selection, setSelection] = useState<Coordinates | null>(null);
   const [radius, setRadius] = useState(100);
   const [showOverview, setShowOverview] = useState(true);
@@ -91,6 +94,7 @@ export default function FieldShiftApp() {
 
   useEffect(() => {
     const ctrl = new AbortController();
+    if (!online || !navigator.onLine) return;
     fetch('/api/nasa/layers', { signal: ctrl.signal }).then(async r => {
       const json = await r.json();
       if (!r.ok) throw new Error(json.error || 'NASA imagery catalog unavailable');
@@ -98,13 +102,14 @@ export default function FieldShiftApp() {
       setLayerError(null);
     }).catch(e => { if (e.name !== 'AbortError') setLayerError(e.message || 'Could not load NASA imagery catalog'); });
     return () => ctrl.abort();
-  }, []);
+  }, [online]);
 
   useEffect(() => {
     if (!selection) { setData(null); setDataError(null); setDataLoading(false); return; }
     const ctrl = new AbortController();
     const saved = fields.find(f => f.id === activeFieldId && f.point[0] === selection[0] && f.point[1] === selection[1]);
-    setData(saved?.nasa ?? null); setDataError(null); setDataLoading(true);
+    setData(saved?.nasa ?? null); setDataError(null); setDataLoading(online);
+    if (!online || !navigator.onLine) return;
     const query = new URLSearchParams({ lng: selection[0].toFixed(4), lat: selection[1].toFixed(4) });
     fetch(`/api/nasa/overview?${query.toString()}`, { signal: ctrl.signal }).then(async res => {
       const json = await res.json();
@@ -113,13 +118,14 @@ export default function FieldShiftApp() {
     }).catch(e => { if (e.name !== 'AbortError') setDataError(e.message || 'Network error'); })
       .finally(() => { if (!ctrl.signal.aborted) setDataLoading(false); });
     return () => ctrl.abort();
-  }, [selection, refreshIndex]);
+  }, [selection, refreshIndex, online]);
 
   useEffect(() => {
     if (!selection) { setWeather(null); setWeatherError(null); setWeatherLoading(false); setWeatherNotConfigured(false); return; }
     const saved = fields.find(f => f.id === activeFieldId && f.point[0] === selection[0] && f.point[1] === selection[1]);
     setWeather(saved?.weather ?? null);
-    setWeatherLoading(true); setWeatherError(null); setWeatherNotConfigured(false);
+    setWeatherLoading(online); setWeatherError(null); setWeatherNotConfigured(false);
+    if (!online || !navigator.onLine) return;
     const controller = new AbortController();
     const params = new URLSearchParams({ lng: selection[0].toFixed(5), lat: selection[1].toFixed(5) });
     fetch(`/api/weather?${params}`, { signal: controller.signal }).then(async response => {
@@ -132,7 +138,7 @@ export default function FieldShiftApp() {
     return () => controller.abort();
   // Fields are intentionally loaded on coordinate selection or explicit refresh.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection, refreshIndex]);
+  }, [selection, refreshIndex, online]);
 
   // When an API finishes after Save, enrich the stored field rather than saving only nulls.
   useEffect(() => {
@@ -147,7 +153,7 @@ export default function FieldShiftApp() {
   }, [weather, activeFieldId]);
 
   useEffect(() => {
-    if (!searchFocused || searchTerm.trim().length < 2 || !HAS_MAP_KEY) { setSearchResults([]); setSearchLoading(false); return; }
+    if (!online || !searchFocused || searchTerm.trim().length < 2 || !HAS_MAP_KEY) { setSearchResults([]); setSearchLoading(false); return; }
     searchAbort.current?.abort();
     const ctrl = new AbortController();
     searchAbort.current = ctrl;
@@ -175,7 +181,7 @@ export default function FieldShiftApp() {
       finally { if (!ctrl.signal.aborted) setSearchLoading(false); }
     }, 340);
     return () => { window.clearTimeout(timer); ctrl.abort(); };
-  }, [searchTerm, searchFocused]);
+  }, [searchTerm, searchFocused, online]);
 
   const statuses: LayerStatus[] = useMemo(() => layerManifest?.layers ?? [], [layerManifest]);
   const previewId = enabledLayers.at(-1);
@@ -234,12 +240,16 @@ export default function FieldShiftApp() {
 
   return <main className="relative h-[100dvh] min-h-[480px] w-full overflow-hidden bg-[#d1dfcd] dark:bg-[#263b2e]">
     <div className="absolute inset-0 bg-[linear-gradient(135deg,#a9bda2_0%,#d3cda4_45%,#7d9e88_100%)]" />
-    {HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
+    {online && HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
 
+    <PwaControls/>
+    {!online && !savedFieldsOpen && !cropsOpen && !chatOpen && !recommendationsOpen && !selection && <div className="absolute left-[calc(var(--sidebar-width)+16px)] right-4 top-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 text-center shadow-float dark:bg-[#18271f] sm:left-[calc(50%+40px)] sm:w-[350px] sm:-translate-x-1/2">
+      <Map size={28} className="mx-auto opacity-50"/><h2 className="mt-3 text-lg font-bold">Map unavailable offline</h2><p className="mt-2 text-sm opacity-75">Connect to the internet to use the map. You can still open and edit your saved fields.</p><button onClick={() => setSavedFieldsOpen(true)} className="mt-4 rounded-xl bg-[#286649] px-4 py-2 text-sm font-semibold text-white">Open saved fields</button>
+    </div>}
     {/* Account-free saved fields and crop histories, persisted locally. */}
     <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[80px] flex-col items-center border-r border-[#ebefeb] dark:border-[#364b40] bg-white/95 dark:bg-[#18271f]/95 px-2 py-4 overflow-y-auto shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[96px]">
       <div className="group flex flex-col items-center gap-1" title="CGS — CeresGaiaSystems">
-        <Image src="/brand/cgs-logo.png" alt="CeresGaiaSystems logo" width={44} height={44} priority className="h-11 w-11 rounded-[10px] bg-white object-contain"/>
+        <Image src="/brand/cgs-logo.png" alt="CeresGaiaSystems logo" width={44} height={44} unoptimized priority className="h-11 w-11 rounded-[10px] bg-white object-contain"/>
         <span className="text-sm font-extrabold tracking-[-.04em] text-[#275641] dark:text-[#e2ece5]">CGS</span>
       </div>
       <div className="mt-5 flex w-full flex-col items-center gap-2">
@@ -263,7 +273,7 @@ export default function FieldShiftApp() {
     {cropsOpen && <CropsModal onClose={() => setCropsOpen(false)}/>}
 
     {/* Place search and dataset pills */}
-    <header className="pointer-events-none absolute left-[calc(var(--sidebar-width)+14px)] right-3 top-3 z-20 md:left-[calc(var(--sidebar-width)+14px)] md:right-5 md:top-4">
+    <header hidden={!online} style={!online ? { display: 'none' } : undefined} className="pointer-events-none absolute left-[calc(var(--sidebar-width)+14px)] right-3 top-3 z-20 md:left-[calc(var(--sidebar-width)+14px)] md:right-5 md:top-4">
       <div className="flex w-full items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-2 sm:flex-initial">
           <div className="pointer-events-auto relative w-full sm:w-[310px] md:w-[345px]">
@@ -300,7 +310,7 @@ export default function FieldShiftApp() {
     </header>
 
     {selection && showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && !chatOpen && !recommendationsOpen && <aside className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[131px] z-10 w-[min(329px,var(--map-panel-width))] md:bottom-[76px] md:left-[calc(var(--sidebar-width)+14px)] md:top-[127px] md:w-[335px]">
-      <FieldOverview onViewMore={() => setMoreDataOpen(true)} selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} placeLabel={placeLabel}/>
+      <FieldOverview offline={!online} onViewMore={() => setMoreDataOpen(true)} selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} placeLabel={placeLabel}/>
     </aside>}
 
 
@@ -314,7 +324,7 @@ export default function FieldShiftApp() {
       </div>)}</div>
     </div>}
 
-    {!selection && HAS_MAP_KEY && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 dark:border-[#364b40]/70 bg-white/95 dark:bg-[#18271f]/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
+    {online && !selection && HAS_MAP_KEY && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 dark:border-[#364b40]/70 bg-white/95 dark:bg-[#18271f]/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
       <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#e6f4e7] dark:bg-[#263b2e] text-[#397a55] dark:text-[#9dd6b3]"><MapPin size={19}/></div>
       <p className="mt-2 text-[13px] font-bold text-[#2b4d3b] dark:text-[#e2ece5]">Explore any area on Earth</p>
       <p className="mt-1 text-[11px] leading-relaxed text-[#859488] dark:text-[#afc2b5]">Click the map to drop a pin and explore real NASA Earth data for that location.</p>
@@ -323,7 +333,7 @@ export default function FieldShiftApp() {
     {selection && moreDataOpen && <div className="absolute inset-0 z-50 bg-black/20" onClick={() => setMoreDataOpen(false)}><div className="contents" onClick={event => event.stopPropagation()}><FieldDataDetails point={selection} name={activeSavedField?.name ?? placeLabel ?? 'Selected field'} data={data} loading={dataLoading} error={dataError} onRefresh={() => setRefreshIndex(i => i + 1)} onClose={() => setMoreDataOpen(false)}/></div></div>}
 
     {/* Satellite / terrain / dark base-map selection */}
-    <div className="absolute bottom-5 left-[calc(var(--sidebar-width)+14px)] z-10 md:bottom-6 md:left-[calc(var(--sidebar-width)+14px)]">
+    <div hidden={!online} style={!online ? { display: 'none' } : undefined} className="absolute bottom-5 left-[calc(var(--sidebar-width)+14px)] z-10 md:bottom-6 md:left-[calc(var(--sidebar-width)+14px)]">
       {stylePickerOpen && <div className="mb-2 grid w-[244px] grid-cols-2 gap-2 rounded-xl bg-white dark:bg-[#18271f] p-2 shadow-float">
         {(Object.entries(BASE_STYLES) as [MapStyleId, typeof BASE_STYLES[MapStyleId]][]).map(([id, item]) => <button key={id} onClick={() => { setStyleId(id); setStylePickerOpen(false); }} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold ${id === styleId ? 'bg-[#eaf4eb] dark:bg-[#263b2e] text-[#205b43] dark:text-[#e2ece5]' : 'hover:bg-[#f6f8f5] dark:hover:bg-[#1b2b23]'}`}>
           <span className={`h-7 w-7 shrink-0 rounded-md border border-black/10 ${id === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : id === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : id === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />{item.name}
@@ -337,7 +347,7 @@ export default function FieldShiftApp() {
     </div>
 
     {/* Right-side map actions */}
-    <div className="absolute right-4 top-[149px] z-10 flex flex-col items-center gap-3 md:right-6 md:top-[175px]">
+    <div hidden={!online} style={!online ? { display: 'none' } : undefined} className="absolute right-4 top-[149px] z-10 flex flex-col items-center gap-3 md:right-6 md:top-[175px]">
       <button onClick={() => mapInstance?.easeTo({ bearing: 0, pitch: 0, duration: 500 })} title="Reset north and tilt" className="flex h-11 w-11 flex-col items-center justify-center rounded-xl bg-white dark:bg-[#18271f] shadow-float"><span className="text-[9px] font-extrabold leading-none text-[#316349] dark:text-[#e2ece5]">N</span><Compass size={16} className="mt-1 text-[#3a7654] dark:text-[#9dd6b3]"/></button>
       <div className="flex flex-col gap-0.5 rounded-xl bg-white dark:bg-[#18271f] p-1 shadow-float">
         <button onClick={locate} title="Locate me" aria-label="Locate me" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23]"><LocateFixed size={19}/></button>
@@ -348,7 +358,7 @@ export default function FieldShiftApp() {
       </div>
     </div>
 
-    {layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,var(--map-panel-width))] rounded-card border border-[#e7eee7] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 shadow-float md:right-6 md:top-[355px]">
+    {online && layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,var(--map-panel-width))] rounded-card border border-[#e7eee7] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 shadow-float md:right-6 md:top-[355px]">
       <div className="flex items-start justify-between gap-2"><div><h3 className="text-[13px] font-bold">NASA map layers</h3><p className="mt-0.5 text-[10px] text-[#91a195] dark:text-[#afc2b5]">Satellite & model visualizations</p></div><button onClick={() => setLayersPanelOpen(false)} className="text-[#91a195] dark:text-[#afc2b5]"><X size={16}/></button></div>
       <div className="mt-3 space-y-1">{LAYER_IDS.map(id => {
         const status = statuses.find(s => s.id === id);
@@ -364,13 +374,14 @@ export default function FieldShiftApp() {
     {helpOpen && <div className="absolute bottom-6 left-[calc(var(--sidebar-width)+14px)] z-30 w-[min(325px,var(--map-panel-width))] rounded-card bg-white dark:bg-[#18271f] p-5 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
       <button onClick={() => setHelpOpen(false)} aria-label="Close help" className="absolute right-3 top-3 text-[#92a095] dark:text-[#afc2b5]"><X size={17}/></button>
       <h3 className="text-[15px] font-bold">How CGS works</h3>
+      <p className="mt-3 text-[11px] leading-relaxed">Install CGS from your browser menu using Install app or Add to Home Screen. On iPhone or iPad, use Safari’s Share menu → Add to Home Screen. Open the app online once to prepare offline access. Saved fields and previously loaded data remain available offline; maps and fresh data need internet.</p>
       <ol className="mt-3 list-inside list-decimal space-y-2 text-[11px] leading-relaxed text-[#697f70] dark:text-[#9dd6b3]">
         <li>Click the map or search for a place.</li><li>Drag the green pin to adjust the center.</li><li>Change the radius to grow or shrink the selected area.</li><li>Use one NASA layer at a time.</li><li>Save the field locally to reuse it later.</li>
       </ol>
       <p className="mt-3 rounded-lg bg-[#f1f6ef] dark:bg-[#1b2b23] p-2 text-[10px] text-[#65816a] dark:text-[#9dd6b3]">No account needed. Saved fields, NASA snapshots, and forecast snapshots stay in your browser's local storage.</p>
     </div>}
 
-    {!HAS_MAP_KEY && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white dark:border-[#364b40] bg-white dark:bg-[#18271f] p-7 shadow-float">
+    {online && !HAS_MAP_KEY && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white dark:border-[#364b40] bg-white dark:bg-[#18271f] p-7 shadow-float">
       <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f3e7] dark:bg-[#263b2e] text-[#286347] dark:text-[#e2ece5]"><Map size={23}/></div>
       <h2 className="text-[19px] font-bold tracking-tight">Connect your MapTiler map</h2>
       <p className="mt-2 text-[12px] leading-relaxed text-[#6b8070] dark:text-[#9dd6b3]">The Next.js project is ready, but MapTiler needs your API key to display the map. NASA POWER and GIBS do not require API keys.</p>

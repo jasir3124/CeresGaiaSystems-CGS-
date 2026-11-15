@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { FieldsProvider } from "@/lib/field-store";
+
+export const viewport: Viewport = { themeColor: '#286649' };
 
 export const metadata: Metadata = {
   icons: {
@@ -13,6 +15,8 @@ export const metadata: Metadata = {
     shortcut: '/favicon.ico?v=2',
     apple: { url: '/apple-touch-icon.png?v=2', sizes: '180x180' }
   },
+  applicationName: "CeresGaiaSystems",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "CGS" },
   title: "CGS | CeresGaiaSystems",
   description: "CGS (CeresGaiaSystems) helps you explore fields, crops, weather, and NASA Earth observation data. No sign-in required."
 };

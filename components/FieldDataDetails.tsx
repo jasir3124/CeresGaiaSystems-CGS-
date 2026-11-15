@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CloudRain, Droplets, Leaf, RefreshCw, Sun, Thermometer, Wind, X } from 'lucide-react';
+import { offlineJson } from '@/lib/offline';
+import { useOnline } from '@/lib/use-online';
 import type { DailyRow, Measurement, OverviewData } from '@/lib/types';
 
 type Props = { name: string; point: [number, number]; data: OverviewData | null; loading: boolean; error: string | null; onClose: () => void; onRefresh: () => void };
@@ -21,6 +23,7 @@ function Sparkline({ rows, metric, label }: { rows: DailyRow[]; metric: 'tempera
 }
 
 export default function FieldDataDetails({ name, point, data, loading, error, onClose, onRefresh }: Props) {
+  const online = useOnline();
   const [days, setDays] = useState(365);
   const [history, setHistory] = useState<OverviewData | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -31,14 +34,12 @@ export default function FieldDataDetails({ name, point, data, loading, error, on
     const controller = new AbortController();
     setHistory(null); setHistoryLoading(true); setHistoryError(null);
     const params = new URLSearchParams({ lng: String(lng), lat: String(lat), history: '1' });
-    fetch(`/api/nasa/overview?${params}`, { signal: controller.signal }).then(async response => {
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'History unavailable');
+    offlineJson<OverviewData>(`/api/nasa/overview?${params}`, controller.signal).then(result => {
       setHistory(result as OverviewData);
     }).catch(error => { if (!controller.signal.aborted) setHistoryError(error instanceof Error ? error.message : 'History unavailable'); })
       .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false); });
     return () => controller.abort();
-  }, [lng, lat, refresh]);
+  }, [lng, lat, refresh, online]);
   data = history ?? data;
   loading = loading || historyLoading;
   error = historyError ?? error;
@@ -91,7 +92,8 @@ export default function FieldDataDetails({ name, point, data, loading, error, on
       <span>{rows.length ? `${date(rows[0].date)}, ${rows[0].date.slice(0, 4)} — ${date(rows.at(-1)!.date)}, ${rows.at(-1)!.date.slice(0, 4)}` : 'No observations available'}</span>
       <label className="flex items-center gap-2">Period<select value={days} onChange={e => setDays(Number(e.target.value))} className="rounded-md bg-transparent p-1 font-semibold"><option value={7}>7 days</option><option value={30}>30 days</option><option value={90}>90 days</option><option value={365}>12 months</option></select></label>
     </div>
-    <div className="mt-3 flex items-center justify-between gap-3"><p className={`text-[11px] ${muted}`}>Latest available observations · dates may lag today</p><button onClick={() => { onRefresh(); setRefresh(value => value + 1); }} disabled={loading} className="flex items-center gap-1 text-xs font-semibold disabled:opacity-50"><RefreshCw size={13} className={loading ? 'animate-spin' : ''}/>Refresh</button></div>
+    <div className="mt-3 flex items-center justify-between gap-3"><p className={`text-[11px] ${muted}`}>Latest available observations · dates may lag today</p><button onClick={() => { onRefresh(); setRefresh(value => value + 1); }} disabled={loading || !online} className="flex items-center gap-1 text-xs font-semibold disabled:opacity-50"><RefreshCw size={13} className={loading ? 'animate-spin' : ''}/>Refresh</button></div>
+    {!online && <p role="status" className={`mt-4 text-sm ${muted}`}>Offline · showing previously downloaded data. Connect to refresh.</p>}
     {loading && <p role="status" className={`mt-4 text-sm ${muted}`}>Loading NASA observations…</p>}
     {error && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-[#302e22] dark:text-amber-300">{error}</p>}
     <section className="mt-6" aria-labelledby="rainfall-title">

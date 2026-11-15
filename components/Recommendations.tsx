@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FlaskConical, LoaderCircle, RefreshCw, Droplets, Thermometer, FlaskConical as SoilIcon, X } from 'lucide-react';
 import { useFields, type SavedField } from '@/lib/field-store';
 import { AGRONOMY, NUTRIENTS, isFieldManagement, isSoilTest, type FieldManagement, type SoilTest } from '@/lib/agronomy';
+import { readOffline, writeOffline } from '@/lib/offline';
+import { useOnline } from '@/lib/use-online';
 import { getCrop } from '@/lib/crops';
 import type { RankedCrop, RecommendationResult } from '@/lib/recommendations';
 
@@ -14,6 +16,7 @@ const dateTime = (value: string | null) => value ? new Date(value).toLocaleStrin
 const number = (value: number | null, digits = 1) => value === null ? '—' : value.toFixed(digits);
 
 export default function Recommendations({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const online = useOnline();
   const { fields, activeFieldId, hydrated } = useFields();
   const [selectedId, setSelectedId] = useState(activeFieldId ?? fields[0]?.id ?? '');
   const [targetMonth, setTargetMonth] = useState('');
@@ -42,18 +45,29 @@ export default function Recommendations({ open, onClose }: { open: boolean; onCl
   }, [open]);
   useEffect(() => {
     if (!open || !hydrated || !requestField) return;
+    if (!online || !navigator.onLine) {
+      let active = true;
+      setLoading(true); setError(null);
+      void readOffline<Report>(`recommendations:${fingerprint}`).then(saved => {
+        if (!active) return;
+        if (saved && saved.fieldId === requestField.id && saved.point[0] === requestField.point[0] && saved.point[1] === requestField.point[1]) setReports(current => ({ ...current, [fingerprint]: saved }));
+        else if (!report) setError('No saved suggestions match these field details yet. Connect to generate suggestions; your field records can still be edited offline.');
+        setLoading(false);
+      });
+      return () => { active = false; };
+    }
     if (report && Date.now() - Date.parse(report.generatedAt) < 3600000 && refresh === 0) { setLoading(false); setError(null); return; }
     const abort = new AbortController();
     setLoading(true); setError(null);
     fetch('/api/recommendations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: fingerprint, signal: abort.signal })
       .then(async response => { const json = await response.json(); if (!response.ok) throw new Error(json.error || 'Could not generate suggestions.'); return json as Report; })
-      .then(json => { if (json.fieldId !== requestField.id || json.point[0] !== requestField.point[0] || json.point[1] !== requestField.point[1]) throw new Error('The response did not match the selected field. Please retry.'); setReports(current => ({ ...current, [fingerprint]: json })); })
+      .then(json => { if (json.fieldId !== requestField.id || json.point[0] !== requestField.point[0] || json.point[1] !== requestField.point[1]) throw new Error('The response did not match the selected field. Please retry.'); setReports(current => ({ ...current, [fingerprint]: json })); void writeOffline(`recommendations:${fingerprint}`, json); })
       .catch(cause => { if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : 'Suggestions unavailable.'); })
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });
     return () => abort.abort();
     // Cache by the complete field inputs, rather than weather snapshot updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, hydrated, fingerprint, refresh]);
+  }, [open, hydrated, fingerprint, refresh, online]);
 
   return <section hidden={!open} style={!open ? { display: 'none' } : undefined} aria-labelledby="recommendations-title" onKeyDown={e => { if (e.key === 'Escape') onClose(); }} className="suggestions-panel absolute bottom-3 left-[calc(var(--sidebar-width)+12px)] right-3 top-3 z-40 flex flex-col overflow-hidden rounded-2xl border border-white/80 dark:border-[#364b40]/80 bg-white dark:bg-[#18271f] text-[#293d32] dark:text-[#e2ece5] shadow-2xl lg:bottom-5 lg:left-auto lg:right-5 lg:top-[110px] lg:w-[min(1000px,calc(100vw-var(--sidebar-width)-250px))]">
     <header className="flex shrink-0 items-start justify-between gap-3 border-b border-[#e3ebe0] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 sm:px-6">
@@ -69,10 +83,12 @@ export default function Recommendations({ open, onClose }: { open: boolean; onCl
           <label className="text-sm font-semibold" htmlFor="planning-month">Planting month
             <select id="planning-month" value={targetMonth} onChange={e => setTargetMonth(e.target.value)} className={control}><option value="">Find the best window</option>{Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{new Date(2024, i, 1).toLocaleDateString('en', { month: 'long' })}</option>)}</select>
           </label>
-          <button type="button" disabled={loading} onClick={() => setRefresh(v => v + 1)} className="flex h-[42px] items-center justify-center gap-2 rounded-lg border border-[#dbe6da] dark:border-[#364b40] bg-white dark:bg-[#18271f] px-3 text-sm font-semibold disabled:opacity-40"><RefreshCw size={16}/> Refresh</button>
+          <button type="button" disabled={loading || !online} onClick={() => setRefresh(v => v + 1)} className="flex h-[42px] items-center justify-center gap-2 rounded-lg border border-[#dbe6da] dark:border-[#364b40] bg-white dark:bg-[#18271f] px-3 text-sm font-semibold disabled:opacity-40"><RefreshCw size={16}/> Refresh</button>
         </div>
         {loading && <p role="status" className="mt-5 flex items-center gap-2 rounded-xl bg-white dark:bg-[#18271f] p-4 text-sm"><LoaderCircle className="animate-spin" size={18}/> Analysing this field's crop history, soil and real weather data. The first climate lookup can take up to a minute.</p>}
         {error && <p role="alert" className="mt-5 rounded-xl bg-red-50 dark:bg-[#342722] p-4 text-sm text-red-700 dark:text-red-300">{error} <button className="font-semibold underline" onClick={() => setRefresh(v => v + 1)}>Retry</button></p>}
+        <FieldInputs key={field.id} field={field}/>
+        {!online && <p role="status" className="mt-4 rounded-xl bg-[#edf4e7] p-3 text-sm dark:bg-[#263b2e]">Offline · saved suggestions reflect the data and forecast available when generated. Reconnect to update suggestions after editing your field.</p>}
         {report && <>
           <div className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[#627063] dark:text-[#9dd6b3]">
             <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#648651]"/> {field.name}</span>
@@ -82,7 +98,6 @@ export default function Recommendations({ open, onClose }: { open: boolean; onCl
           <CropGroups crops={report.ranked}/>
           <p className="mt-5 text-sm leading-relaxed text-[#647264] dark:text-[#9dd6b3]">Suitability estimates guide comparison; they do not predict yield. Check each crop's confidence and field conditions before planting.</p>
 
-          <FieldInputs key={field.id} field={field}/>
           {report.observations && <details className="mt-4 rounded-xl border border-[#e3ebe0] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 text-sm"><summary className="cursor-pointer font-bold">NASA observations used for current-crop context</summary><dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">{[
             ['Air temperature', report.observations.temperature], ['Relative humidity', report.observations.humidity], ['Wind speed', report.observations.windSpeed], [report.observations.soilLabel ?? 'Regional soil wetness', report.observations.soilWetness], ['Solar radiation', report.observations.solarRadiation], ['Recent rainfall', report.observations.rainfallSevenDays]
           ].map(([label, raw]) => { const measurement = raw as { value: number | null; unit: string; date: string | null }; return <div key={String(label)}><dt className="text-[#657260] dark:text-[#9dd6b3]">{String(label)}</dt><dd className="mt-1 font-semibold">{number(measurement.value)} {measurement.unit}</dd><dd className="mt-1 text-xs text-[#657260] dark:text-[#9dd6b3]">Observation: {measurement.date ?? 'missing'}</dd></div>; })}</dl><p className="mt-3 text-[#657260] dark:text-[#9dd6b3]">Rainfall includes {report.observations.rainfallSevenDays.daysAvailable}/7 days, {report.observations.rainfallSevenDays.start}–{report.observations.rainfallSevenDays.end}. {report.observations.soilNote} These are regional modeled observations, not field sensors or a forecast.</p></details>}

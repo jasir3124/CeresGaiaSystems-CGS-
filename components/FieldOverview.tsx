@@ -6,6 +6,7 @@ import type { Coordinates, Measurement, OverviewData } from '@/lib/types';
 import { areaHectares } from '@/lib/geo.mjs';
 
 type Props = {
+  offline: boolean;
   onViewMore: () => void;
   selection: Coordinates;
   radius: number;
@@ -45,7 +46,7 @@ function Metric({ title, measurement, icon, tone, note, digits = 1 }: {
   </div>;
 }
 
-export default function FieldOverview({ selection, radius, onRadius, onClear, onClose, onSave, saved, initialName, onRefresh, data, loading, error, placeLabel, onViewMore }: Props) {
+export default function FieldOverview({ offline, selection, radius, onRadius, onClear, onClose, onSave, saved, initialName, onRefresh, data, loading, error, placeLabel, onViewMore }: Props) {
   const [fieldName, setFieldName] = useState(initialName);
   useEffect(() => setFieldName(initialName), [initialName]);
   const area = areaHectares(radius);
@@ -74,10 +75,11 @@ export default function FieldOverview({ selection, radius, onRadius, onClear, on
       </div>
       <input id="field-radius" type="range" min={25} max={5000} step={25} value={radius} onChange={e => onRadius(Number(e.target.value))} className="mt-3 h-1.5 w-full cursor-pointer" aria-label="Selection radius in meters" />
       <div className="mt-1 flex justify-between text-[9px] text-[#a1ada4] dark:text-[#afc2b5]"><span>25 m</span><span>5 km</span></div>
+      {offline && <p role="status" className="mt-4 rounded-xl bg-[#edf5ed] p-3 text-xs dark:bg-[#263b2e]">Offline · showing your last saved observations. Connect to refresh data or view the map.</p>}
       <div className="mt-5 border-t border-[#e9eee9] dark:border-[#364b40] pt-4">
         <div className="flex items-center justify-between gap-1">
           <h3 className="text-[13px] font-bold">NASA observations</h3>
-          <button onClick={onRefresh} disabled={loading} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-[#59866c] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23] disabled:opacity-50"><RefreshCw size={12} className={loading ? 'animate-spin' : ''}/> Refresh</button>
+          <button onClick={onRefresh} disabled={loading || offline} className="flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] text-[#59866c] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23] disabled:opacity-50"><RefreshCw size={12} className={loading ? 'animate-spin' : ''}/> Refresh</button>
         </div>
         <p className="mt-1 text-[10px] text-[#85958a] dark:text-[#afc2b5]">{data?.latestWeatherDate ? `Latest available air data: ${dateShort(data.latestWeatherDate)}` : loading ? 'Retrieving observed NASA data…' : 'Daily satellite and model-derived datasets'}</p>
         {data?.sampledPoint && <p className="mt-1 text-[9.5px] text-[#94a499] dark:text-[#afc2b5]">NASA POWER grid sample: {data.sampledPoint[1].toFixed(2)}°, {data.sampledPoint[0].toFixed(2)}°</p>}
