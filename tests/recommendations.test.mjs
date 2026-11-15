@@ -55,6 +55,19 @@ describe('Field-specific recommendation scoring', () => {
     assert.equal(Object.values(SCORE_POLICY).reduce((a, b) => a + b, 0), 100);
     for (const crop of a.ranked) { assert.ok(crop.score >= 0 && crop.score <= 100); assert.equal(crop.factors.length, 7); assert.ok(AGRONOMY[crop.cropId]); }
   });
+  it('ranks crops without optional field details and incorporates supplied soil evidence', () => {
+    const optionalField = { id: field.id, name: field.name, point: field.point, radius: field.radius };
+    const baseline = run({ field: optionalField });
+    assert.equal(baseline.current, null);
+    assert.ok(baseline.ranked.every(crop => Number.isFinite(crop.score)));
+    assert.equal(factor(baseline, 'potato', 'soil').score, null);
+    const withSoil = run({ field: { ...optionalField, soilTests: [sample] } });
+    assert.notEqual(factor(withSoil, 'potato', 'soil').score, null);
+    assert.notEqual(factor(withSoil, 'potato', 'nutrients').score, null);
+    assert.ok(withSoil.ranked.some(crop => crop.score !== baseline.ranked.find(previous => previous.cropId === crop.cropId).score));
+    const irrigated = run({ field: { ...optionalField, management: { currentCropId: null, irrigation: 'irrigated' } } });
+    assert.deepEqual(irrigated.ranked.map(crop => crop.score), baseline.ranked.map(crop => crop.score));
+  });
   it('never infers NPK from weather or previous crops', () => {
     const report = run();
     assert.ok(report.ranked.every(c => c.factors.find(f => f.key === 'nutrients').score === null));

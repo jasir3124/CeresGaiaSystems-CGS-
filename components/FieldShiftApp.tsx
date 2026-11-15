@@ -1,10 +1,13 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type maplibregl from 'maplibre-gl';
 import { MessageCircle, Sprout, Save, Trash2, ArrowRight, ChevronDown, ChevronLeft, CloudRain, Compass, Crosshair, Droplets, ExternalLink, HelpCircle, Layers, Leaf, LocateFixed, Map, MapPin, Mountain, Search, SlidersHorizontal, Sparkles, Sun, Thermometer, Wind, X, ZoomIn, ZoomOut } from 'lucide-react';
 import FieldOverview from './FieldOverview';
+import FieldDataDetails from './FieldDataDetails';
+import ThemeToggle from './ThemeToggle';
 import FieldChat from './FieldChat';
 import CropsModal from './CropsModal';
 import Recommendations from './Recommendations';
@@ -36,6 +39,8 @@ export default function FieldShiftApp() {
   const [selection, setSelection] = useState<Coordinates | null>(null);
   const [radius, setRadius] = useState(100);
   const [showOverview, setShowOverview] = useState(true);
+  const [moreDataOpen, setMoreDataOpen] = useState(false);
+  useEffect(() => { setMoreDataOpen(false); }, [selection]);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
   const [styleId, setStyleId] = useState<MapStyleId>('satellite');
   const [stylePickerOpen, setStylePickerOpen] = useState(false);
@@ -227,26 +232,27 @@ export default function FieldShiftApp() {
     );
   };
 
-  return <main className="relative h-[100dvh] min-h-[480px] w-full overflow-hidden bg-[#d1dfcd]">
+  return <main className="relative h-[100dvh] min-h-[480px] w-full overflow-hidden bg-[#d1dfcd] dark:bg-[#263b2e]">
     <div className="absolute inset-0 bg-[linear-gradient(135deg,#a9bda2_0%,#d3cda4_45%,#7d9e88_100%)]" />
     {HAS_MAP_KEY && <MapCanvas maptilerKey={MAPTILER_KEY} selection={selection} radius={radius} styleId={styleId} enabledLayers={enabledLayers} layerStatuses={statuses} onSelect={coords => handleSelect(coords)} focus={focus} onReady={setMapInstance} />}
 
     {/* Account-free saved fields and crop histories, persisted locally. */}
-    <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[80px] flex-col items-center border-r border-[#ebefeb] bg-white/95 px-2 py-4 overflow-y-auto shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[96px]">
+    <nav aria-label="Primary navigation" className="absolute inset-y-0 left-0 z-30 flex w-[80px] flex-col items-center border-r border-[#ebefeb] dark:border-[#364b40] bg-white/95 dark:bg-[#18271f]/95 px-2 py-4 overflow-y-auto shadow-[3px_0_16px_rgba(20,50,30,.08)] backdrop-blur-md md:w-[96px]">
       <div className="group flex flex-col items-center gap-1" title="CGS — CeresGaiaSystems">
-        <div className="grid h-11 w-11 place-items-center rounded-[10px] bg-[#225c44] text-white"><Leaf size={23} strokeWidth={1.8}/></div>
-        <span className="text-sm font-extrabold tracking-[-.04em] text-[#275641]">CGS</span>
+        <Image src="/brand/cgs-logo.png" alt="CeresGaiaSystems logo" width={44} height={44} priority className="h-11 w-11 rounded-[10px] bg-white object-contain"/>
+        <span className="text-sm font-extrabold tracking-[-.04em] text-[#275641] dark:text-[#e2ece5]">CGS</span>
       </div>
       <div className="mt-5 flex w-full flex-col items-center gap-2">
-        <button onClick={() => { setSavedFieldsOpen(false); setCropsOpen(false); setHelpOpen(false); setRecommendationsOpen(false); setChatOpen(false); setShowOverview(true); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#758478] hover:bg-[#f7faf6]'}`} title="Explore" aria-current={!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'page' : undefined}><Map size={22}/><span className="text-xs font-semibold">Explore</span></button>
-        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setSavedFieldsOpen(v => !v); setCropsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={22}/><span className="text-xs">Fields</span></button>
-        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setCropsOpen(true); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${cropsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Crops" aria-haspopup="dialog" aria-expanded={cropsOpen}><Sprout size={22}/><span className="text-xs">Crops</span></button>
-        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(true); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${chatOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="AI field assistant" aria-expanded={chatOpen}><MessageCircle size={22}/><span className="text-xs">AI Chat</span></button>
-        <button onClick={() => { setRecommendationsOpen(true); setChatOpen(false); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${recommendationsOpen ? 'bg-[#eef5ee] text-[#286048]' : 'text-[#8a9990] hover:bg-[#f7faf6]'}`} title="Suggestions" aria-expanded={recommendationsOpen}><Sparkles size={22}/><span className="text-[11px] font-semibold">Suggestions</span></button>
+        <button onClick={() => { setSavedFieldsOpen(false); setCropsOpen(false); setHelpOpen(false); setRecommendationsOpen(false); setChatOpen(false); setShowOverview(true); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'bg-[#eef5ee] dark:bg-[#1b2b23] text-[#286048] dark:text-[#e2ece5]' : 'text-[#758478] dark:text-[#9dd6b3] hover:bg-[#f7faf6] dark:hover:bg-[#1b2b23]'}`} title="Explore" aria-current={!recommendationsOpen && !chatOpen && !cropsOpen && !savedFieldsOpen && !helpOpen ? 'page' : undefined}><Map size={22}/><span className="text-xs font-semibold">Explore</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setSavedFieldsOpen(v => !v); setCropsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${savedFieldsOpen ? 'bg-[#eef5ee] dark:bg-[#1b2b23] text-[#286048] dark:text-[#e2ece5]' : 'text-[#8a9990] dark:text-[#afc2b5] hover:bg-[#f7faf6] dark:hover:bg-[#1b2b23]'}`} title="Saved fields" aria-expanded={savedFieldsOpen}><Save size={22}/><span className="text-xs">Fields</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setCropsOpen(true); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${cropsOpen ? 'bg-[#eef5ee] dark:bg-[#1b2b23] text-[#286048] dark:text-[#e2ece5]' : 'text-[#8a9990] dark:text-[#afc2b5] hover:bg-[#f7faf6] dark:hover:bg-[#1b2b23]'}`} title="Crops" aria-haspopup="dialog" aria-expanded={cropsOpen}><Sprout size={22}/><span className="text-xs">Crops</span></button>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(true); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${chatOpen ? 'bg-[#eef5ee] dark:bg-[#1b2b23] text-[#286048] dark:text-[#e2ece5]' : 'text-[#8a9990] dark:text-[#afc2b5] hover:bg-[#f7faf6] dark:hover:bg-[#1b2b23]'}`} title="AI field assistant" aria-expanded={chatOpen}><MessageCircle size={22}/><span className="text-xs">AI Chat</span></button>
+        <button onClick={() => { setRecommendationsOpen(true); setChatOpen(false); setCropsOpen(false); setSavedFieldsOpen(false); setHelpOpen(false); }} className={`flex h-[68px] w-full flex-col items-center justify-center gap-2 rounded-xl ${recommendationsOpen ? 'bg-[#eef5ee] dark:bg-[#1b2b23] text-[#286048] dark:text-[#e2ece5]' : 'text-[#8a9990] dark:text-[#afc2b5] hover:bg-[#f7faf6] dark:hover:bg-[#1b2b23]'}`} title="Suggestions" aria-expanded={recommendationsOpen}><Sparkles size={22}/><span className="text-[11px] font-semibold">Suggestions</span></button>
       </div>
       <div className="mt-auto flex flex-col items-center gap-2 pb-1">
-        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setHelpOpen(v => !v); setSavedFieldsOpen(false); setCropsOpen(false); }} aria-label="How to use CGS" className="grid h-11 w-11 place-items-center rounded-xl text-[#84948a] hover:bg-[#f2f7f1] hover:text-[#1f5b42]"><HelpCircle size={23}/></button>
-        <span className="text-xs text-[#9cab9f]">Help</span>
+        <ThemeToggle/>
+        <button onClick={() => { setRecommendationsOpen(false); setChatOpen(false); setHelpOpen(v => !v); setSavedFieldsOpen(false); setCropsOpen(false); }} aria-label="How to use CGS" className="grid h-11 w-11 place-items-center rounded-xl text-[#84948a] dark:text-[#afc2b5] hover:bg-[#f2f7f1] dark:hover:bg-[#1b2b23] hover:text-[#1f5b42] dark:hover:text-[#e2ece5]"><HelpCircle size={23}/></button>
+        <span className="text-xs text-[#9cab9f] dark:text-[#afc2b5]">Help</span>
       </div>
     </nav>
 
@@ -261,114 +267,116 @@ export default function FieldShiftApp() {
       <div className="flex w-full items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-start gap-2 sm:flex-initial">
           <div className="pointer-events-auto relative w-full sm:w-[310px] md:w-[345px]">
-            <div className="flex h-[44px] items-center gap-2.5 rounded-xl border border-white/70 bg-white px-3.5 shadow-soft">
-              <Search size={18} className="shrink-0 text-[#397c58]" />
-              <input ref={searchInput} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={e => { if (e.key === 'Escape') { setSearchFocused(false); searchInput.current?.blur(); } else if (e.key === 'Enter' && searchResults.length) { const top = searchResults[0]; handleSelect(top.geometry.coordinates, top.properties.name || 'Searched location', true); setSearchTerm(top.properties.full_address || top.properties.name || ''); searchInput.current?.blur(); } }} placeholder="Search a place, address, or coordinates" aria-label="Search for location" className="w-full min-w-0 bg-transparent text-[11px] text-[#415f4d] outline-none placeholder:text-[#a0ada3]" />
-              {searchTerm && <button onClick={() => { setSearchTerm(''); setSearchResults([]); searchInput.current?.focus(); }} aria-label="Clear search" className="text-[#99a89d]"><X size={14}/></button>}
+            <div className="flex h-[44px] items-center gap-2.5 rounded-xl border border-white/70 dark:border-[#364b40]/70 bg-white dark:bg-[#18271f] px-3.5 shadow-soft">
+              <Search size={18} className="shrink-0 text-[#397c58] dark:text-[#9dd6b3]" />
+              <input ref={searchInput} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={e => { if (e.key === 'Escape') { setSearchFocused(false); searchInput.current?.blur(); } else if (e.key === 'Enter' && searchResults.length) { const top = searchResults[0]; handleSelect(top.geometry.coordinates, top.properties.name || 'Searched location', true); setSearchTerm(top.properties.full_address || top.properties.name || ''); searchInput.current?.blur(); } }} placeholder="Search a place, address, or coordinates" aria-label="Search for location" className="w-full min-w-0 bg-transparent text-[11px] text-[#415f4d] dark:text-[#9dd6b3] outline-none placeholder:text-[#a0ada3] dark:placeholder:text-[#afc2b5]" />
+              {searchTerm && <button onClick={() => { setSearchTerm(''); setSearchResults([]); searchInput.current?.focus(); }} aria-label="Clear search" className="text-[#99a89d] dark:text-[#afc2b5]"><X size={14}/></button>}
             </div>
-            {searchFocused && searchTerm.length >= 2 && <div className="absolute inset-x-0 top-[50px] overflow-hidden rounded-xl bg-white shadow-float">
-              {searchLoading && <p className="p-3 text-[11px] text-[#8b998f]">Finding placesâ€¦</p>}
-              {searchError && <p className="p-3 text-[11px] text-amber-700">{searchError}</p>}
-              {!searchLoading && !searchError && searchResults.map((r, i) => <button key={`${r.geometry.coordinates.join('-')}-${i}`} onClick={() => { handleSelect(r.geometry.coordinates, r.properties.name || 'Searched location', true); setSearchTerm(r.properties.full_address || r.properties.name || ''); searchInput.current?.blur(); }} className="flex w-full items-start gap-2 border-b border-[#f0f3ee] px-3 py-2.5 text-left hover:bg-[#f5f9f5]"><MapPin className="mt-0.5 shrink-0 text-[#5b876a]" size={15}/><span className="min-w-0"><strong className="block truncate text-[11px] text-[#31533e]">{r.properties.name || 'Location'}</strong><span className="block truncate text-[10px] text-[#90a095]">{r.properties.place_formatted || r.properties.full_address}</span></span></button>)}
-              {!searchLoading && !searchError && !searchResults.length && <p className="p-3 text-[11px] text-[#8b998f]">No matching places. Try another search or click the map.</p>}
+            {searchFocused && searchTerm.length >= 2 && <div className="absolute inset-x-0 top-[50px] overflow-hidden rounded-xl bg-white dark:bg-[#18271f] shadow-float">
+              {searchLoading && <p className="p-3 text-[11px] text-[#8b998f] dark:text-[#afc2b5]">Finding placesâ€¦</p>}
+              {searchError && <p className="p-3 text-[11px] text-amber-700 dark:text-amber-300">{searchError}</p>}
+              {!searchLoading && !searchError && searchResults.map((r, i) => <button key={`${r.geometry.coordinates.join('-')}-${i}`} onClick={() => { handleSelect(r.geometry.coordinates, r.properties.name || 'Searched location', true); setSearchTerm(r.properties.full_address || r.properties.name || ''); searchInput.current?.blur(); }} className="flex w-full items-start gap-2 border-b border-[#f0f3ee] dark:border-[#364b40] px-3 py-2.5 text-left hover:bg-[#f5f9f5] dark:hover:bg-[#1b2b23]"><MapPin className="mt-0.5 shrink-0 text-[#5b876a] dark:text-[#9dd6b3]" size={15}/><span className="min-w-0"><strong className="block truncate text-[11px] text-[#31533e] dark:text-[#e2ece5]">{r.properties.name || 'Location'}</strong><span className="block truncate text-[10px] text-[#90a095] dark:text-[#afc2b5]">{r.properties.place_formatted || r.properties.full_address}</span></span></button>)}
+              {!searchLoading && !searchError && !searchResults.length && <p className="p-3 text-[11px] text-[#8b998f] dark:text-[#afc2b5]">No matching places. Try another search or click the map.</p>}
             </div>}
           </div>
-          <button onClick={() => { setToast('Click anywhere on the map to place a pin, then adjust the radius in the overview.'); setSearchFocused(false); }} className="pointer-events-auto hidden h-[44px] shrink-0 items-center gap-2 rounded-xl bg-white px-4 text-[11px] font-semibold text-[#32674d] shadow-soft transition hover:bg-[#f2f7f0] md:flex"><MapPin size={15}/> Select an area</button>
+          <button onClick={() => { setToast('Click anywhere on the map to place a pin, then adjust the radius in the overview.'); setSearchFocused(false); }} className="pointer-events-auto hidden h-[44px] shrink-0 items-center gap-2 rounded-xl bg-white dark:bg-[#18271f] px-4 text-[11px] font-semibold text-[#32674d] dark:text-[#9dd6b3] shadow-soft transition hover:bg-[#f2f7f0] dark:hover:bg-[#1b2b23] md:flex"><MapPin size={15}/> Select an area</button>
         </div>
-        <div className="pointer-events-auto hidden shrink-0 items-center gap-2 rounded-xl bg-white px-4 py-2.5 shadow-soft lg:flex">
-          <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef4ea] text-[#447953]"><Sun size={17}/></span>
-          <span><span className="block text-[11px] font-bold text-[#344d3d]">CGS Earth Explorer</span><span className="block text-[9px] text-[#8fa092]">Observed data Â· not a live forecast</span></span>
+        <div className="pointer-events-auto hidden shrink-0 items-center gap-2 rounded-xl bg-white dark:bg-[#18271f] px-4 py-2.5 shadow-soft lg:flex">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eef4ea] dark:bg-[#263b2e] text-[#447953] dark:text-[#9dd6b3]"><Sun size={17}/></span>
+          <span><span className="block text-[11px] font-bold text-[#344d3d] dark:text-[#e2ece5]">CGS Earth Explorer</span><span className="block text-[9px] text-[#8fa092] dark:text-[#afc2b5]">Observed data Â· not a live forecast</span></span>
         </div>
       </div>
       <div className="pointer-events-auto soft-scroll mt-2.5 flex max-w-[730px] gap-1.5 overflow-x-auto pb-1">
         {layerOrder.map(id => {
           const selected = enabledLayers.includes(id);
           const status = statuses.find(s => s.id === id);
-          return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={selected} title={`${DATA_LAYERS[id].details}${status?.date ? ` Â· ${fmtDate(status.date)}` : ''}`} className={`flex h-[29px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold shadow-sm transition-colors ${selected ? 'border-[#245d45] bg-[#235f46] text-white' : 'border-white/90 bg-white/95 text-[#627666] hover:bg-[#f1f7ef]'}`}>
-            <span className={selected ? 'text-[#d4f2d7]' : 'text-[#5e8a6b]'}>{layerIcons[id]}</span>{DATA_LAYERS[id].label}
-            {selected && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[#bdf7b5]" />}
+          return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={selected} title={`${DATA_LAYERS[id].details}${status?.date ? ` Â· ${fmtDate(status.date)}` : ''}`} className={`flex h-[29px] shrink-0 items-center gap-1.5 rounded-full border px-3 text-[10px] font-semibold shadow-sm transition-colors ${selected ? 'border-[#245d45] dark:border-[#578a69] bg-[#235f46] text-white' : 'border-white/90 dark:border-[#364b40]/90 bg-white/95 dark:bg-[#18271f]/95 text-[#627666] dark:text-[#9dd6b3] hover:bg-[#f1f7ef] dark:hover:bg-[#1b2b23]'}`}>
+            <span className={selected ? 'text-[#d4f2d7] dark:text-[#afc2b5]' : 'text-[#5e8a6b] dark:text-[#9dd6b3]'}>{layerIcons[id]}</span>{DATA_LAYERS[id].label}
+            {selected && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-[#bdf7b5] dark:bg-[#263b2e]" />}
           </button>;
         })}
-        <button onClick={() => setLayersPanelOpen(v => !v)} className="flex h-[29px] shrink-0 items-center gap-1 rounded-full bg-white/95 px-3 text-[10px] font-semibold text-[#5d7763] shadow-sm"><SlidersHorizontal size={13}/> More</button>
+        <button onClick={() => setLayersPanelOpen(v => !v)} className="flex h-[29px] shrink-0 items-center gap-1 rounded-full bg-white/95 dark:bg-[#18271f]/95 px-3 text-[10px] font-semibold text-[#5d7763] dark:text-[#9dd6b3] shadow-sm"><SlidersHorizontal size={13}/> More</button>
       </div>
     </header>
 
     {selection && showOverview && !savedFieldsOpen && !cropsOpen && !helpOpen && !chatOpen && !recommendationsOpen && <aside className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[131px] z-10 w-[min(329px,var(--map-panel-width))] md:bottom-[76px] md:left-[calc(var(--sidebar-width)+14px)] md:top-[127px] md:w-[335px]">
-      <FieldOverview selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} weather={weather} weatherLoading={weatherLoading} weatherError={weatherError} weatherNotConfigured={weatherNotConfigured} placeLabel={placeLabel} preview={preview}/>
+      <FieldOverview onViewMore={() => setMoreDataOpen(true)} selection={selection} radius={radius} onRadius={setRadius} onClear={clearSelection} onClose={() => setShowOverview(false)} onSave={persistSelection} saved={isSavedUnchanged} initialName={activeSavedField?.name ?? placeLabel ?? 'My field'} onRefresh={() => setRefreshIndex(i => i + 1)} data={data} loading={dataLoading} error={dataError} placeLabel={placeLabel}/>
     </aside>}
 
 
-    {savedFieldsOpen && <div className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[133px] z-20 w-[min(316px,var(--map-panel-width))] overflow-y-auto rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
-      <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-[#2b5038]">Saved fields</h3><button onClick={() => setSavedFieldsOpen(false)} aria-label="Close saved fields" className="text-[#869a8c]"><X size={17}/></button></div>
-      <p className="mt-1 text-[10px] text-[#93a297]">Stored on this device Â· {fields.length} fields</p>
-      {fields.length === 0 && <p className="mt-4 rounded-xl bg-[#f4f8f3] p-3 text-[11px] leading-relaxed text-[#7c8e80]">Select an area and use Save field in the overview. It will stay here even after you close the browser.</p>}
-      <div className="mt-3 space-y-2">{fields.map(field => <div key={field.id} className="flex items-center gap-2 rounded-xl border border-[#e6eee6] p-2">
-        <button onClick={() => loadField(field.id)} className="min-w-0 flex-1 p-1 text-left hover:text-[#236b48]"><strong className="block truncate text-[11px]">{field.name}</strong><small className="block text-[9px] text-[#90a095]">{field.point[1].toFixed(4)}, {field.point[0].toFixed(4)} Â· {field.radius} m</small><small className="block text-[9px] text-[#8da093]">{field.nasa ? 'NASA saved' : 'NASA pending'} Â· {field.weather ? 'Weather saved' : 'Weather pending'}</small></button>
-        <button onClick={() => { deleteField(field.id); if (field.id === activeFieldId) clearSelection(); }} aria-label={`Delete ${field.name}`} title="Delete saved field" className="rounded-lg p-2 text-[#a3aaa3] hover:bg-red-50 hover:text-red-600"><Trash2 size={15}/></button>
+    {savedFieldsOpen && <div className="absolute bottom-[76px] left-[calc(var(--sidebar-width)+14px)] top-[133px] z-20 w-[min(316px,var(--map-panel-width))] overflow-y-auto rounded-card border border-[#e7eee7] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
+      <div className="flex items-center justify-between"><h3 className="text-[14px] font-bold text-[#2b5038] dark:text-[#e2ece5]">Saved fields</h3><button onClick={() => setSavedFieldsOpen(false)} aria-label="Close saved fields" className="text-[#869a8c] dark:text-[#afc2b5]"><X size={17}/></button></div>
+      <p className="mt-1 text-[10px] text-[#93a297] dark:text-[#afc2b5]">Stored on this device Â· {fields.length} fields</p>
+      {fields.length === 0 && <p className="mt-4 rounded-xl bg-[#f4f8f3] dark:bg-[#1b2b23] p-3 text-[11px] leading-relaxed text-[#7c8e80] dark:text-[#afc2b5]">Select an area and use Save field in the overview. It will stay here even after you close the browser.</p>}
+      <div className="mt-3 space-y-2">{fields.map(field => <div key={field.id} className="flex items-center gap-2 rounded-xl border border-[#e6eee6] dark:border-[#364b40] p-2">
+        <button onClick={() => loadField(field.id)} className="min-w-0 flex-1 p-1 text-left hover:text-[#236b48] dark:hover:text-[#e2ece5]"><strong className="block truncate text-[11px]">{field.name}</strong><small className="block text-[9px] text-[#90a095] dark:text-[#afc2b5]">{field.point[1].toFixed(4)}, {field.point[0].toFixed(4)} Â· {field.radius} m</small><small className="block text-[9px] text-[#8da093] dark:text-[#afc2b5]">{field.nasa ? 'NASA saved' : 'NASA pending'} Â· {field.weather ? 'Weather saved' : 'Weather pending'}</small></button>
+        <button onClick={() => { deleteField(field.id); if (field.id === activeFieldId) clearSelection(); }} aria-label={`Delete ${field.name}`} title="Delete saved field" className="rounded-lg p-2 text-[#a3aaa3] dark:text-[#afc2b5] hover:bg-red-50 dark:hover:bg-[#342722] hover:text-red-600 dark:hover:text-red-300"><Trash2 size={15}/></button>
       </div>)}</div>
     </div>}
 
-    {!selection && HAS_MAP_KEY && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 bg-white/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
-      <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#e6f4e7] text-[#397a55]"><MapPin size={19}/></div>
-      <p className="mt-2 text-[13px] font-bold text-[#2b4d3b]">Explore any area on Earth</p>
-      <p className="mt-1 text-[11px] leading-relaxed text-[#859488]">Click the map to drop a pin and explore real NASA Earth data for that location.</p>
+    {!selection && HAS_MAP_KEY && <div className="pointer-events-none absolute bottom-[105px] left-1/2 z-10 w-[min(340px,calc(100vw-80px))] -translate-x-1/2 rounded-2xl border border-white/70 dark:border-[#364b40]/70 bg-white/95 dark:bg-[#18271f]/95 p-4 text-center shadow-float backdrop-blur-md sm:bottom-[93px]">
+      <div className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#e6f4e7] dark:bg-[#263b2e] text-[#397a55] dark:text-[#9dd6b3]"><MapPin size={19}/></div>
+      <p className="mt-2 text-[13px] font-bold text-[#2b4d3b] dark:text-[#e2ece5]">Explore any area on Earth</p>
+      <p className="mt-1 text-[11px] leading-relaxed text-[#859488] dark:text-[#afc2b5]">Click the map to drop a pin and explore real NASA Earth data for that location.</p>
     </div>}
+
+    {selection && moreDataOpen && <div className="absolute inset-0 z-50 bg-black/20" onClick={() => setMoreDataOpen(false)}><div className="contents" onClick={event => event.stopPropagation()}><FieldDataDetails point={selection} name={activeSavedField?.name ?? placeLabel ?? 'Selected field'} data={data} loading={dataLoading} error={dataError} onRefresh={() => setRefreshIndex(i => i + 1)} onClose={() => setMoreDataOpen(false)}/></div></div>}
 
     {/* Satellite / terrain / dark base-map selection */}
     <div className="absolute bottom-5 left-[calc(var(--sidebar-width)+14px)] z-10 md:bottom-6 md:left-[calc(var(--sidebar-width)+14px)]">
-      {stylePickerOpen && <div className="mb-2 grid w-[244px] grid-cols-2 gap-2 rounded-xl bg-white p-2 shadow-float">
-        {(Object.entries(BASE_STYLES) as [MapStyleId, typeof BASE_STYLES[MapStyleId]][]).map(([id, item]) => <button key={id} onClick={() => { setStyleId(id); setStylePickerOpen(false); }} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold ${id === styleId ? 'bg-[#eaf4eb] text-[#205b43]' : 'hover:bg-[#f6f8f5]'}`}>
+      {stylePickerOpen && <div className="mb-2 grid w-[244px] grid-cols-2 gap-2 rounded-xl bg-white dark:bg-[#18271f] p-2 shadow-float">
+        {(Object.entries(BASE_STYLES) as [MapStyleId, typeof BASE_STYLES[MapStyleId]][]).map(([id, item]) => <button key={id} onClick={() => { setStyleId(id); setStylePickerOpen(false); }} className={`flex items-center gap-2 rounded-lg px-2 py-2 text-left text-[11px] font-semibold ${id === styleId ? 'bg-[#eaf4eb] dark:bg-[#263b2e] text-[#205b43] dark:text-[#e2ece5]' : 'hover:bg-[#f6f8f5] dark:hover:bg-[#1b2b23]'}`}>
           <span className={`h-7 w-7 shrink-0 rounded-md border border-black/10 ${id === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : id === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : id === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />{item.name}
         </button>)}
       </div>}
-      <button onClick={() => setStylePickerOpen(v => !v)} aria-expanded={stylePickerOpen} className="flex h-[49px] items-center gap-3 rounded-xl bg-white p-1.5 pr-4 shadow-float">
-        <span className={`h-[37px] w-[37px] rounded-lg border border-white/70 ${styleId === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : styleId === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : styleId === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />
-        <span className="text-left"><strong className="block text-[11px] leading-tight">{BASE_STYLES[styleId].name}</strong><small className="block text-[9px] text-[#a5b0a7]">{styleId === 'satellite' ? 'MapTiler imagery' : 'MapTiler basemap'}</small></span>
-        <Layers size={17} className="ml-1 text-[#487e5b]"/>
+      <button onClick={() => setStylePickerOpen(v => !v)} aria-expanded={stylePickerOpen} className="flex h-[49px] items-center gap-3 rounded-xl bg-white dark:bg-[#18271f] p-1.5 pr-4 shadow-float">
+        <span className={`h-[37px] w-[37px] rounded-lg border border-white/70 dark:border-[#364b40]/70 ${styleId === 'satellite' ? 'bg-[linear-gradient(135deg,#526c4e_15%,#a6ae67_30%,#48604d_45%,#c5a96f_60%,#355f47_85%)]' : styleId === 'terrain' ? 'bg-[linear-gradient(120deg,#c8d6b5,#87aa7f,#d7cfaa)]' : styleId === 'dark' ? 'bg-[linear-gradient(125deg,#13202c,#283e51)]' : 'bg-[linear-gradient(125deg,#f1e4cd,#c5d8c5)]'}`} />
+        <span className="text-left"><strong className="block text-[11px] leading-tight">{BASE_STYLES[styleId].name}</strong><small className="block text-[9px] text-[#a5b0a7] dark:text-[#afc2b5]">{styleId === 'satellite' ? 'MapTiler imagery' : 'MapTiler basemap'}</small></span>
+        <Layers size={17} className="ml-1 text-[#487e5b] dark:text-[#9dd6b3]"/>
       </button>
     </div>
 
     {/* Right-side map actions */}
     <div className="absolute right-4 top-[149px] z-10 flex flex-col items-center gap-3 md:right-6 md:top-[175px]">
-      <button onClick={() => mapInstance?.easeTo({ bearing: 0, pitch: 0, duration: 500 })} title="Reset north and tilt" className="flex h-11 w-11 flex-col items-center justify-center rounded-xl bg-white shadow-float"><span className="text-[9px] font-extrabold leading-none text-[#316349]">N</span><Compass size={16} className="mt-1 text-[#3a7654]"/></button>
-      <div className="flex flex-col gap-0.5 rounded-xl bg-white p-1 shadow-float">
-        <button onClick={locate} title="Locate me" aria-label="Locate me" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] hover:bg-[#f0f5ef]"><LocateFixed size={19}/></button>
-        <div className="mx-2 h-px bg-[#e8eee8]"/>
-        <button onClick={() => zoom(1)} title="Zoom in" aria-label="Zoom in" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] hover:bg-[#f0f5ef]"><ZoomIn size={19}/></button>
-        <div className="mx-2 h-px bg-[#e8eee8]"/>
-        <button onClick={() => zoom(-1)} title="Zoom out" aria-label="Zoom out" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] hover:bg-[#f0f5ef]"><ZoomOut size={19}/></button>
+      <button onClick={() => mapInstance?.easeTo({ bearing: 0, pitch: 0, duration: 500 })} title="Reset north and tilt" className="flex h-11 w-11 flex-col items-center justify-center rounded-xl bg-white dark:bg-[#18271f] shadow-float"><span className="text-[9px] font-extrabold leading-none text-[#316349] dark:text-[#e2ece5]">N</span><Compass size={16} className="mt-1 text-[#3a7654] dark:text-[#9dd6b3]"/></button>
+      <div className="flex flex-col gap-0.5 rounded-xl bg-white dark:bg-[#18271f] p-1 shadow-float">
+        <button onClick={locate} title="Locate me" aria-label="Locate me" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23]"><LocateFixed size={19}/></button>
+        <div className="mx-2 h-px bg-[#e8eee8] dark:bg-[#263b2e]"/>
+        <button onClick={() => zoom(1)} title="Zoom in" aria-label="Zoom in" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23]"><ZoomIn size={19}/></button>
+        <div className="mx-2 h-px bg-[#e8eee8] dark:bg-[#263b2e]"/>
+        <button onClick={() => zoom(-1)} title="Zoom out" aria-label="Zoom out" className="grid h-10 w-10 place-items-center rounded-lg text-[#477e5b] dark:text-[#9dd6b3] hover:bg-[#f0f5ef] dark:hover:bg-[#1b2b23]"><ZoomOut size={19}/></button>
       </div>
     </div>
 
-    {layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,var(--map-panel-width))] rounded-card border border-[#e7eee7] bg-white p-4 shadow-float md:right-6 md:top-[355px]">
-      <div className="flex items-start justify-between gap-2"><div><h3 className="text-[13px] font-bold">NASA map layers</h3><p className="mt-0.5 text-[10px] text-[#91a195]">Satellite & model visualizations</p></div><button onClick={() => setLayersPanelOpen(false)} className="text-[#91a195]"><X size={16}/></button></div>
+    {layersPanelOpen && <div className="absolute right-4 top-[332px] z-20 w-[min(298px,var(--map-panel-width))] rounded-card border border-[#e7eee7] dark:border-[#364b40] bg-white dark:bg-[#18271f] p-4 shadow-float md:right-6 md:top-[355px]">
+      <div className="flex items-start justify-between gap-2"><div><h3 className="text-[13px] font-bold">NASA map layers</h3><p className="mt-0.5 text-[10px] text-[#91a195] dark:text-[#afc2b5]">Satellite & model visualizations</p></div><button onClick={() => setLayersPanelOpen(false)} className="text-[#91a195] dark:text-[#afc2b5]"><X size={16}/></button></div>
       <div className="mt-3 space-y-1">{LAYER_IDS.map(id => {
         const status = statuses.find(s => s.id === id);
         const enabled = enabledLayers.includes(id);
-        return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={enabled} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-[#f6f9f5]">
-          <span className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#eef6ed] text-[#3b7853]">{layerIcons[id]}</span><span className="min-w-0"><strong className="block text-[11px] font-semibold">{DATA_LAYERS[id].label}</strong><small className="block truncate text-[9px] text-[#96a49b]">{status?.date ? `NASA Â· ${fmtDate(status.date)}` : layerError ? 'Catalog unavailable' : status ? 'No available imagery' : 'Checking NASAâ€¦'}</small></span></span><span className="switch" data-on={enabled}/>
+        return <button key={id} onClick={() => toggleLayer(id)} aria-pressed={enabled} className="flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-[#f6f9f5] dark:hover:bg-[#1b2b23]">
+          <span className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#eef6ed] dark:bg-[#1b2b23] text-[#3b7853] dark:text-[#9dd6b3]">{layerIcons[id]}</span><span className="min-w-0"><strong className="block text-[11px] font-semibold">{DATA_LAYERS[id].label}</strong><small className="block truncate text-[9px] text-[#96a49b] dark:text-[#afc2b5]">{status?.date ? `NASA Â· ${fmtDate(status.date)}` : layerError ? 'Catalog unavailable' : status ? 'No available imagery' : 'Checking NASAâ€¦'}</small></span></span><span className="switch" data-on={enabled}/>
         </button>;
       })}</div>
-      {layerError && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[10px] text-amber-700">{layerError}</p>}
-      <p className="mt-3 border-t border-[#e9efea] pt-3 text-[10px] leading-relaxed text-[#859488]">One NASA map layer at a time. Wind imagery is historical; current forecast values appear in the Meteomatics overview.</p>
+      {layerError && <p className="mt-2 rounded-lg bg-amber-50 dark:bg-[#302e22] p-2 text-[10px] text-amber-700 dark:text-amber-300">{layerError}</p>}
+      <p className="mt-3 border-t border-[#e9efea] dark:border-[#364b40] pt-3 text-[10px] leading-relaxed text-[#859488] dark:text-[#afc2b5]">One NASA map layer at a time. Wind imagery is historical; current forecast values appear in the Meteomatics overview.</p>
     </div>}
 
-    {helpOpen && <div className="absolute bottom-6 left-[calc(var(--sidebar-width)+14px)] z-30 w-[min(325px,var(--map-panel-width))] rounded-card bg-white p-5 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
-      <button onClick={() => setHelpOpen(false)} aria-label="Close help" className="absolute right-3 top-3 text-[#92a095]"><X size={17}/></button>
+    {helpOpen && <div className="absolute bottom-6 left-[calc(var(--sidebar-width)+14px)] z-30 w-[min(325px,var(--map-panel-width))] rounded-card bg-white dark:bg-[#18271f] p-5 shadow-float md:left-[calc(var(--sidebar-width)+14px)]">
+      <button onClick={() => setHelpOpen(false)} aria-label="Close help" className="absolute right-3 top-3 text-[#92a095] dark:text-[#afc2b5]"><X size={17}/></button>
       <h3 className="text-[15px] font-bold">How CGS works</h3>
-      <ol className="mt-3 list-inside list-decimal space-y-2 text-[11px] leading-relaxed text-[#697f70]">
+      <ol className="mt-3 list-inside list-decimal space-y-2 text-[11px] leading-relaxed text-[#697f70] dark:text-[#9dd6b3]">
         <li>Click the map or search for a place.</li><li>Drag the green pin to adjust the center.</li><li>Change the radius to grow or shrink the selected area.</li><li>Use one NASA layer at a time.</li><li>Save the field locally to reuse it later.</li>
       </ol>
-      <p className="mt-3 rounded-lg bg-[#f1f6ef] p-2 text-[10px] text-[#65816a]">No account needed. Saved fields, NASA snapshots, and forecast snapshots stay in your browser's local storage.</p>
+      <p className="mt-3 rounded-lg bg-[#f1f6ef] dark:bg-[#1b2b23] p-2 text-[10px] text-[#65816a] dark:text-[#9dd6b3]">No account needed. Saved fields, NASA snapshots, and forecast snapshots stay in your browser's local storage.</p>
     </div>}
 
-    {!HAS_MAP_KEY && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white bg-white p-7 shadow-float">
-      <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f3e7] text-[#286347]"><Map size={23}/></div>
+    {!HAS_MAP_KEY && <div className="absolute left-1/2 top-1/2 z-10 w-[min(460px,calc(100vw-95px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white dark:border-[#364b40] bg-white dark:bg-[#18271f] p-7 shadow-float">
+      <div className="mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-[#e6f3e7] dark:bg-[#263b2e] text-[#286347] dark:text-[#e2ece5]"><Map size={23}/></div>
       <h2 className="text-[19px] font-bold tracking-tight">Connect your MapTiler map</h2>
-      <p className="mt-2 text-[12px] leading-relaxed text-[#6b8070]">The Next.js project is ready, but MapTiler needs your API key to display the map. NASA POWER and GIBS do not require API keys.</p>
-      <code className="mt-4 block break-all rounded-lg bg-[#f0f4ef] p-3 text-[11px] text-[#245d42]">NEXT_PUBLIC_MAPTILER_KEY=your_maptiler_key_here</code>
-      <p className="mt-2 text-[10px] text-[#809183]">Save this in <strong>.env.local</strong> and restart the development server.</p>
-      <a href="https://cloud.maptiler.com/account/keys/" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1 text-[11px] font-bold text-[#286849] hover:underline">Get a MapTiler API key <ExternalLink size={12}/></a>
+      <p className="mt-2 text-[12px] leading-relaxed text-[#6b8070] dark:text-[#9dd6b3]">The Next.js project is ready, but MapTiler needs your API key to display the map. NASA POWER and GIBS do not require API keys.</p>
+      <code className="mt-4 block break-all rounded-lg bg-[#f0f4ef] dark:bg-[#1b2b23] p-3 text-[11px] text-[#245d42] dark:text-[#e2ece5]">NEXT_PUBLIC_MAPTILER_KEY=your_maptiler_key_here</code>
+      <p className="mt-2 text-[10px] text-[#809183] dark:text-[#afc2b5]">Save this in <strong>.env.local</strong> and restart the development server.</p>
+      <a href="https://cloud.maptiler.com/account/keys/" target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1 text-[11px] font-bold text-[#286849] dark:text-[#e2ece5] hover:underline">Get a MapTiler API key <ExternalLink size={12}/></a>
     </div>}
 
     {toast && <div role="status" className="absolute bottom-[88px] right-4 z-30 flex max-w-[300px] items-start gap-3 rounded-xl bg-[#20523e] px-4 py-3 text-[11px] leading-relaxed text-white shadow-float md:right-6"><span>{toast}</span><button onClick={() => setToast(null)} aria-label="Dismiss message" className="mt-0.5 shrink-0 text-white/80 hover:text-white"><X size={15}/></button></div>}

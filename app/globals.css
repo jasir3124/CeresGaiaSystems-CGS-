@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 :root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+html.dark body { color: #e2ece5; background: #122019; }
+html.dark main > div:first-child { background: linear-gradient(135deg, #17291f, #26382a 45%, #12251d); }
+html.dark .soft-scroll { scrollbar-color: #486151 transparent; }
+html.dark .soft-scroll::-webkit-scrollbar-thumb { background: #486151; }
+html.dark .switch { background: #486151; }
+html.dark .switch[data-on='true'] { background: #39825b; }
+html.dark .crop-group-best > div > h3 { color: #9dd6b3; }
+html.dark .crop-group-moderate > div > h3 { color: #e5c782; }
+html.dark .crop-group-poor > div > h3 { color: #e5ab9a; }
+html.dark .crop-group-moderate .crop-suggestion-card { background: #302e22; }
+html.dark .crop-group-moderate .crop-score { background: #494027; color: #e5c782; }
+html.dark .crop-group-poor .crop-suggestion-card { background: #342722; }
+html.dark .crop-group-poor .crop-score { background: #50342d; color: #e5ab9a; }
+html.dark .crop-group-unknown .crop-suggestion-card { background: #26332b; }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #253c32; overflow: hidden; }

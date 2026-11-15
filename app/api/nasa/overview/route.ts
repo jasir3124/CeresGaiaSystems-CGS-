@@ -64,12 +64,14 @@ export async function GET(request: NextRequest) {
 
   // Real NASA observations, not a weather forecast. Request a long enough period
   // for data processing delays, then choose the most recent *actually present* day.
+  const history = request.nextUrl.searchParams.get('history') === '1';
   const end = ymd(new Date(Date.now() - DAY * 3));
-  const start = ymd(new Date(Date.now() - DAY * 95));
+  const start = ymd(new Date(Date.now() - DAY * (history ? 370 : 95)));
   try {
     const agPromise = loadPower(sampledLatitude, sampledLongitude, start, end, 'AG', AG_PARAMS);
     // Hydrology can take longer; attach a rejection handler immediately.
     void agPromise.catch(() => {});
+    // Soil parameters use AG: the live daily API rejects HY as a community.
     // Hydrology data can lag meteorology. Query a longer period, and retry with
     // NASA POWER's distinct volumetric surface-moisture series if wetness is absent.
     const hyStart = ymd(new Date(Date.now() - DAY * 370));
@@ -78,12 +80,12 @@ export async function GET(request: NextRequest) {
     let soilSource: 'GWETTOP' | 'SFMC' | null = null;
     let hy: Record<string, Record<string, number>> = {};
     try {
-      hy = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'HY', ['GWETTOP']);
+      hy = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'AG', ['GWETTOP']);
       if (Object.values(hy.GWETTOP ?? {}).some(v => valid(v) && v >= 0 && v <= 1)) soilSource = 'GWETTOP';
     } catch (error) { hydrologyError = error instanceof Error ? error.message : 'NASA hydrology unavailable'; }
     if (!soilSource) {
       try {
-        const alternate = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'HY', ['SFMC']);
+        const alternate = await loadPower(sampledLatitude, sampledLongitude, hyStart, hyEnd, 'AG', ['SFMC']);
         if (Object.values(alternate.SFMC ?? {}).some(v => valid(v) && v >= 0 && v <= 1)) {
           hy = alternate;
           soilSource = 'SFMC';
@@ -124,7 +126,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const allKeys = Array.from(new Set([...Object.keys(ag.T2M ?? {}), ...Object.keys(ag.PRECTOTCORR ?? {}), ...Object.keys(hy[soilSource ?? 'GWETTOP'] ?? {})])).sort().slice(-30);
+    const allKeys = Array.from(new Set([...Object.keys(ag.T2M ?? {}), ...Object.keys(ag.PRECTOTCORR ?? {}), ...Object.keys(hy[soilSource ?? 'GWETTOP'] ?? {})])).sort().slice(history ? -365 : -30);
     const daily: DailyRow[] = allKeys.map(date => ({
       date: readable(date),
       temperature: numberOrNull(ag.T2M, date),
@@ -137,7 +139,7 @@ export async function GET(request: NextRequest) {
       temperature, humidity, windSpeed, windDirection, soilWetness, soilLabel, soilNote, soilSource, solarRadiation,
       rainfallSevenDays, daily,
       note: 'NASA POWER regional modeled values, with individual observation dates.',
-      source: 'NASA POWER · AG and HY daily point APIs (UTC)'
+      source: 'NASA POWER · AG daily point API (UTC)'
     };
     return NextResponse.json(result, { headers: { 'Cache-Control': 'public, max-age=0, s-maxage=14400, stale-while-revalidate=3600' } });
   } catch (err) {
