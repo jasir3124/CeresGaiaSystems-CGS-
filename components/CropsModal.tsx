@@ -11,12 +11,11 @@ const formatDate = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateSt
 const selectClass = 'mt-2 w-full rounded-xl border border-[#dbe6da] dark:border-[#364b40] bg-white dark:bg-[#18271f] px-3 py-2.5 text-sm text-[#2b5038] dark:text-[#e2ece5] outline-none focus:border-[#397c58] focus:ring-2 focus:ring-[#397c58]/20';
 
 export default function CropsModal({ onClose }: { onClose: () => void }) {
-  const { fields, activeFieldId, hydrated, saveFieldCrops } = useFields();
-  const [selectedId, setSelectedId] = useState(activeFieldId ?? fields[0]?.id ?? '');
+  const { fields, activeFieldId, planningFieldId, setPlanningFieldId, hydrated, saveFieldCrops } = useFields();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [messages, setMessages] = useState<Record<string, { text: string; error: boolean }>>({});
   const dialog = useRef<HTMLDialogElement>(null);
-  const field = fields.find(item => item.id === selectedId) ?? fields[0];
+  const field = fields.find(item => item.id === (planningFieldId ?? activeFieldId)) ?? fields[0];
   const draft = field ? drafts[field.id] ?? emptyDraft : emptyDraft;
   const crop = draft.cropId ? getCrop(draft.cropId) : null;
   const months = crop ? growingMonths(crop) : null;
@@ -48,7 +47,7 @@ export default function CropsModal({ onClose }: { onClose: () => void }) {
         <h3 className="text-xs font-bold uppercase tracking-wider text-[#71836f] dark:text-[#9dd6b3]">Your fields ({fields.length})</h3>
         <p className="mt-1 text-xs text-[#71836f] dark:text-[#9dd6b3]">Saved crops, newest first</p>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-2 md:max-h-[60dvh] md:flex-col md:overflow-y-auto">
-          {fields.map(item => <button type="button" key={item.id} onClick={() => setSelectedId(item.id)} aria-pressed={item.id === field.id} className={`min-w-[160px] rounded-xl border p-3 text-left transition md:min-w-0 ${item.id === field.id ? 'border-[#91b28a] dark:border-[#578a69] bg-[#edf4e7] dark:bg-[#263b2e]' : 'border-[#e3ebe0] dark:border-[#364b40] bg-white dark:bg-[#18271f] hover:border-[#91b28a] dark:hover:border-[#578a69]'}`}>
+          {fields.map(item => <button type="button" key={item.id} onClick={() => setPlanningFieldId(item.id)} aria-pressed={item.id === field.id} className={`min-w-[160px] rounded-xl border p-3 text-left transition md:min-w-0 ${item.id === field.id ? 'border-[#91b28a] dark:border-[#578a69] bg-[#edf4e7] dark:bg-[#263b2e]' : 'border-[#e3ebe0] dark:border-[#364b40] bg-white dark:bg-[#18271f] hover:border-[#91b28a] dark:hover:border-[#578a69]'}`}>
             <strong className="block break-words text-sm">{item.name}</strong>
             <span className="mt-1 block text-[10px] text-[#71836f] dark:text-[#9dd6b3]">{item.point[1].toFixed(4)}, {item.point[0].toFixed(4)}</span>
             <span className="mt-2 block text-xs text-[#71836f] dark:text-[#9dd6b3]">{item.cropHistory?.length ?? 0} crops recorded</span>
@@ -58,7 +57,7 @@ export default function CropsModal({ onClose }: { onClose: () => void }) {
 
       <section className="min-w-0">
         <label htmlFor="crop-field" className="text-xs font-semibold">Which field are you recording?</label>
-        <select id="crop-field" value={field.id} onChange={event => setSelectedId(event.target.value)} className={selectClass}>
+        <select id="crop-field" value={field.id} onChange={event => setPlanningFieldId(event.target.value)} className={selectClass}>
           {fields.map(item => <option key={item.id} value={item.id}>{item.name} ({item.point[1].toFixed(4)}, {item.point[0].toFixed(4)})</option>)}
         </select>
         <h3 className="mt-6 text-base font-bold">Add a crop</h3>

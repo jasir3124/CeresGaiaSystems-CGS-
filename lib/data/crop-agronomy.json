@@ -25,7 +25,12 @@
       "https://www.fao.org/4/y4263e/y4263e0e.htm",
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
     ],
-    "droughtSensitivity": "low-medium"
+    "droughtSensitivity": "low-medium",
+    "nutrientFocus": [
+      "sulfur",
+      "zinc",
+      "iron"
+    ]
   },
   "maize": {
     "nitrogen": "high",
@@ -53,7 +58,11 @@
       "https://www.fao.org/4/y4263e/y4263e0e.htm",
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
     ],
-    "droughtSensitivity": "medium-high"
+    "droughtSensitivity": "medium-high",
+    "nutrientFocus": [
+      "sulfur",
+      "zinc"
+    ]
   },
   "barley": {
     "nitrogen": "moderate",
@@ -81,7 +90,10 @@
       "https://www.fao.org/4/y4263e/y4263e0e.htm",
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops"
     ],
-    "droughtSensitivity": "low-medium"
+    "droughtSensitivity": "low-medium",
+    "nutrientFocus": [
+      "sulfur"
+    ]
   },
   "soybean": {
     "nitrogen": "fixing",
@@ -111,7 +123,13 @@
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops/soybean-fertilizer-guidelines"
     ],
-    "droughtSensitivity": "low-medium"
+    "droughtSensitivity": "low-medium",
+    "nutrientFocus": [
+      "calcium",
+      "magnesium",
+      "sulfur",
+      "iron"
+    ]
   },
   "sunflower": {
     "nitrogen": "moderate",
@@ -140,7 +158,11 @@
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
       "https://extension.umn.edu/nutrient-management/sunflower-fertilizer-guidelines"
     ],
-    "droughtSensitivity": "low-medium"
+    "droughtSensitivity": "low-medium",
+    "nutrientFocus": [
+      "sulfur",
+      "boron"
+    ]
   },
   "potato": {
     "nitrogen": "high",
@@ -170,7 +192,15 @@
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
       "https://blog-crop-news.extension.umn.edu/2023/10/potato-nutrient-management-research-5.html"
     ],
-    "droughtSensitivity": "high"
+    "droughtSensitivity": "high",
+    "nutrientFocus": [
+      "calcium",
+      "magnesium",
+      "sulfur",
+      "iron",
+      "zinc",
+      "boron"
+    ]
   },
   "tomato": {
     "nitrogen": "high",
@@ -201,6 +231,13 @@
       "https://extension.umn.edu/agriculture/crop-production/nutrient-management-for-minnesota-crops",
       "https://extension.missouri.edu/publications/g6370"
     ],
-    "droughtSensitivity": "medium-high"
+    "droughtSensitivity": "medium-high",
+    "nutrientFocus": [
+      "calcium",
+      "magnesium",
+      "iron",
+      "zinc",
+      "boron"
+    ]
   }
 }

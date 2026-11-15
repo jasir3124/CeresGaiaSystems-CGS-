@@ -3,6 +3,7 @@ import type { CropId } from './crops';
 
 export type Demand = 'moderate' | 'high' | 'fixing';
 export const AGRONOMY_SOURCES = {
+  chemistry: 'https://extension.missouri.edu/publications/g9077',
   water: 'https://www.fao.org/4/S2022E/s2022e07.htm',
   rotation: 'https://www.vegetables.cornell.edu/pest-management/disease-factsheets/do-rotations-matter-within-disease-management-programs/',
   evapotranspiration: 'https://www.fao.org/4/x0490e/x0490e07.htm',
@@ -16,6 +17,7 @@ export const AGRONOMY_SOURCES = {
 export interface AgronomyProfile {
   nitrogen: Demand; phosphorus: Demand; potassium: Demand;
   secondary: string[]; micronutrients: string[];
+  nutrientFocus: NutrientKey[];
   organicMatter: string; salinityThresholdEce: number;
   waterMm: { min: number; max: number }; kcMid: number; droughtSensitivity: 'low-medium' | 'medium-high' | 'high';
   nutrientNotes: string[]; residue: string; sources: string[];
@@ -23,7 +25,7 @@ export interface AgronomyProfile {
 // Versioned reference data. Demand classes are qualitative CGS screening categories,
 // NOT fertilizer rates or measured nutrient depletion. ECe means saturated-paste EC.
 // Seasonal ET and mid-season Kc are broad FAO planning values, not irrigation prescriptions.
-export const AGRONOMY_VERSION = '2026-11-14.1';
+export const AGRONOMY_VERSION = '2026-11-15.rotation.1';
 export const AGRONOMY = cropProfiles as Record<CropId, AgronomyProfile>;
 
 export type NutrientKey = 'nitrogen' | 'phosphorus' | 'potassium' | 'calcium' | 'magnesium' | 'sulfur' | 'iron' | 'zinc' | 'boron';

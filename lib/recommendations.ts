@@ -1,3 +1,4 @@
+import type { RotationPlan } from './crop-rotation';
 import { CROPS, getCrop, sortCropHistory, type CropHistory, type CropId } from './crops';
 import { AGRONOMY, AGRONOMY_VERSION, type SoilTest, type FieldManagement } from './agronomy';
 import { mean, type ClimateAnalysis, type ClimateMonth } from './climate';
@@ -22,6 +23,7 @@ export interface CurrentAdvice {
 }
 export interface RecommendationResult {
   fieldId: string; point: [number, number]; generatedAt: string; catalogVersion: string;
+  rotation?: RotationPlan;
   ranked: RankedCrop[]; current: CurrentAdvice | null; gaps: string[];
   climate: ClimateAnalysis | null; climateNotes: string[]; soilTestDate: string | null;
   forecastAt: string | null; forecastThrough: string | null; forecast: WeatherData | null; observations: OverviewData | null;

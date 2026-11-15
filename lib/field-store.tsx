@@ -24,11 +24,13 @@ type Snapshot = { nasa?: OverviewData | null; weather?: WeatherData | null };
 type FieldsContextType = {
   fields: SavedField[];
   activeFieldId: string | null;
+  planningFieldId: string | null;
+  setPlanningFieldId: (id: string) => void;
   hydrated: boolean;
   setActiveFieldId: (id: string | null) => void;
   saveField: (value: Omit<SavedField, 'id' | 'savedAt' | 'updatedAt' | 'cropHistory' | 'soilTests' | 'management'>, existingId?: string | null) => SavedField | null;
   saveFieldCrops: (id: string, crops: CropHistory) => boolean;
-  saveFieldAgronomy: (id: string, soilTests: SoilTest[], management: FieldManagement) => boolean;
+  saveFieldAgronomy: (id: string, soilTests: SoilTest[], management: FieldManagement, cropHistory?: CropHistory) => boolean;
   updateFieldSnapshot: (id: string, snapshot: Snapshot) => void;
   deleteField: (id: string) => void;
 };
@@ -49,6 +51,7 @@ function isField(value: unknown): value is SavedField {
 export function FieldsProvider({ children }: { children: React.ReactNode }) {
   const [fields, setFields] = useState<SavedField[]>([]);
   const [activeFieldId, setActiveFieldIdState] = useState<string | null>(null);
+  const [planningFieldId, setPlanningFieldId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -60,6 +63,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
         management: isFieldManagement(field.management) ? field.management : undefined
       })));
       setActiveFieldIdState(localStorage.getItem(ACTIVE_KEY));
+      setPlanningFieldId(localStorage.getItem(ACTIVE_KEY));
     } catch (error) { console.warn('Could not read saved fields', error); }
     setHydrated(true);
   }, []);
@@ -80,8 +84,8 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
   }, [activeFieldId, hydrated]);
 
   const value = useMemo<FieldsContextType>(() => ({
-    fields, activeFieldId, hydrated,
-    setActiveFieldId: setActiveFieldIdState,
+    fields, activeFieldId, planningFieldId, setPlanningFieldId, hydrated,
+    setActiveFieldId: id => { setActiveFieldIdState(id); if (id) setPlanningFieldId(id); },
     saveField: (field, existingId) => {
       if (!hydrated) return null;
       const now = new Date().toISOString();
@@ -106,6 +110,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       }
       setFields(next);
       setActiveFieldIdState(result.id);
+      setPlanningFieldId(result.id);
       return result;
     },
     saveFieldCrops: (id, crops) => {
@@ -126,11 +131,12 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       setFields(next);
       return true;
     },
-    saveFieldAgronomy: (id, soilTests, management) => {
+    saveFieldAgronomy: (id, soilTests, management, cropHistory) => {
       const existing = fields.find(field => field.id === id);
-      if (!hydrated || !existing || !Array.isArray(soilTests) || !soilTests.every(isSoilTest) || !isFieldManagement(management) ||
-        (management.currentCropId !== null && !existing.cropHistory?.some(record => record.id === management.currentCropId && record.plantedOn && record.plantedOn <= new Date().toISOString().slice(0, 10)))) return false;
-      const next = fields.map(field => field.id === id ? { ...field, soilTests, management, updatedAt: new Date().toISOString() } : field);
+      const nextHistory = cropHistory ?? existing?.cropHistory ?? [];
+      if (!hydrated || !existing || !isCropHistory(nextHistory) || !Array.isArray(soilTests) || !soilTests.every(isSoilTest) || !isFieldManagement(management) ||
+        (management.currentCropId !== null && !nextHistory.some(record => record.id === management.currentCropId && record.plantedOn && record.plantedOn <= new Date().toISOString().slice(0, 10)))) return false;
+      const next = fields.map(field => field.id === id ? { ...field, soilTests, management, cropHistory: sortCropHistory(nextHistory), updatedAt: new Date().toISOString() } : field);
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); }
       catch { return false; }
       setFields(next);
@@ -147,8 +153,9 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
     deleteField: id => {
       setFields(current => current.filter(f => f.id !== id));
       setActiveFieldIdState(current => current === id ? null : current);
+      setPlanningFieldId(current => current === id ? null : current);
     }
-  }), [fields, activeFieldId, hydrated]);
+  }), [fields, activeFieldId, planningFieldId, hydrated]);
 
   return <FieldsContext.Provider value={value}>{children}</FieldsContext.Provider>;
 }

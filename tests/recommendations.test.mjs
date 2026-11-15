@@ -10,7 +10,7 @@ import ts from 'typescript';
 // weather below is test input only; production recommendations always call real APIs.
 const compiled = mkdtempSync(join(tmpdir(), 'cgs-recommendations-tests-'));
 after(() => { assert.ok(resolve(compiled).startsWith(resolve(tmpdir()) + '\\cgs-recommendations-tests-') || resolve(compiled).startsWith(resolve(tmpdir()) + '/cgs-recommendations-tests-')); rmSync(compiled, { recursive: true, force: true }); });
-for (const name of ['crops', 'agronomy', 'climate', 'recommendations']) {
+for (const name of ['crops', 'agronomy', 'climate', 'recommendations', 'agronomy-draft', 'crop-rotation']) {
   const source = readFileSync(new URL(`../lib/${name}.ts`, import.meta.url), 'utf8').replace("import cropProfiles from './data/crop-agronomy.json';", `const cropProfiles = ${readFileSync(new URL('../lib/data/crop-agronomy.json', import.meta.url), 'utf8')};`);
   const output = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText.replace(/from ['"]\.\/([^'"]+)['"]/g, 'from "./$1.mjs"');
   writeFileSync(join(compiled, `${name}.mjs`), output);
@@ -18,12 +18,93 @@ for (const name of ['crops', 'agronomy', 'climate', 'recommendations']) {
 const { generateRecommendations, estimateReferenceEt, SCORE_POLICY } = await import(pathToFileURL(join(compiled, 'recommendations.mjs')));
 const { analyseClimate, parsePowerClimate, slopePerDecade } = await import(pathToFileURL(join(compiled, 'climate.mjs')));
 const { isSoilTest, isFieldManagement, AGRONOMY } = await import(pathToFileURL(join(compiled, 'agronomy.mjs')));
+const { initialInputDraft, prepareManagement } = await import(pathToFileURL(join(compiled, 'agronomy-draft.mjs')));
+const { generateRotationPlan, scoreRotationChemistry } = await import(pathToFileURL(join(compiled, 'crop-rotation.mjs')));
 const NOW = Date.parse('2026-11-14T12:00:00Z');
 const field = { id: 'a', name: 'North field', point: [20.995, 42.009], radius: 100, cropHistory: [{ id: 'r1', cropId: 'potato', plantedOn: '2026-09-01' }], management: { currentCropId: 'r1', irrigation: 'rainfed', growthStage: 'mid-season' } };
 const sample = { id: 'test', sampledOn: '2026-10-01', source: 'Local laboratory', method: 'Olsen P, exchangeable K, water pH', depthCm: 20, ph: 6.2, salinityEce: 0.5, nutrients: { nitrogen: { value: 12, unit: 'mg/kg', interpretation: 'low' }, phosphorus: { value: 8, unit: 'mg/kg', interpretation: 'low' }, potassium: { value: 100, unit: 'mg/kg', interpretation: 'sufficient' } } };
 const emptyClimate = () => ({ start: '2011-01-01', end: '2025-12-31', yearsRequested: 15, yearsUsable: 15, months: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, years: 15, temperature: 20, minimum: 12, maximum: 28, rain: 60, humidity: 60, wind: 2, solar: 15, frostDays: 0, hotDays: 0, dryDays: 10, rainCv: 0.3, rainTrendPerDecade: -2, temperatureTrendPerDecade: 0.3 })), annual: Array.from({ length: 15 }, (_, i) => ({ year: 2011 + i, temperature: 20, rain: 720, solar: 15, hotDays: 0, frostDays: 0, longestDrySpell: 10 })), trends: { temperaturePerDecade: 0.3, rainPerDecade: -24, solarPerDecade: 0, hotDaysPerDecade: 1, frostDaysPerDecade: -1, drySpellDaysPerDecade: 1 } });
 const run = (overrides = {}) => generateRecommendations({ field, climate: emptyClimate(), weather: null, now: NOW, ...overrides });
 const factor = (report, id, key) => report.ranked.find(r => r.cropId === id).factors.find(f => f.key === key);
+
+describe('Three-crop rotation sequence search', () => {
+  it('uses the last three actual plantings and searches ordered, non-overlapping family breaks', () => {
+    const cropHistory = [
+      { id: 'future', cropId: 'barley', plantedOn: '2027-01-01' },
+      { id: 'latest', cropId: 'tomato', plantedOn: '2026-10-01' },
+      { id: 'second', cropId: 'potato', plantedOn: '2026-09-01' },
+      { id: 'third', cropId: 'maize', plantedOn: '2026-08-01' },
+      { id: 'older', cropId: 'wheat', plantedOn: '2026-07-01' }
+    ];
+    const plan = generateRotationPlan({ field: { ...field, cropHistory, soilTests: [sample] }, climate: emptyClimate(), now: NOW });
+    assert.deepEqual(plan.history.map(record => record.id), ['latest', 'second', 'third']);
+    assert.equal(plan.steps.length, 3);
+    assert.equal(new Set(plan.steps.map(step => step.cropId)).size, 3);
+    assert.ok(plan.evaluatedSequences > 1);
+    const families = ['Solanaceae', ...plan.steps.map(step => ({ wheat: 'Poaceae', barley: 'Poaceae', maize: 'Poaceae', soybean: 'Fabaceae', sunflower: 'Asteraceae', tomato: 'Solanaceae', potato: 'Solanaceae' })[step.cropId])];
+    for (let index = 1; index < families.length; index++) assert.notEqual(families[index], families[index - 1]);
+    for (let index = 1; index < plan.steps.length; index++) assert.ok(plan.steps[index].plantingOn >= plan.steps[index - 1].availableAfter);
+    assert.ok(plan.alternatives.every(alternative => alternative.score <= plan.score));
+    assert.doesNotMatch(JSON.stringify(plan), /NaN|undefined|Infinity/);
+  });
+  it('uses all nine interpreted nutrients without inventing a soil balance or treating unknown categories as evidence', () => {
+    const nutrients = Object.fromEntries(['nitrogen', 'phosphorus', 'potassium', 'calcium', 'magnesium', 'sulfur', 'iron', 'zinc', 'boron'].map(key => [key, { value: 10, unit: 'mg/kg', interpretation: 'sufficient' }]));
+    const complete = { ...sample, nutrients };
+    const known = scoreRotationChemistry('potato', complete, field.cropHistory, NOW);
+    assert.equal(known.coverage, 1); assert.equal(known.score, 100);
+    for (const key of Object.keys(nutrients)) {
+      const low = { ...complete, nutrients: { ...nutrients, [key]: { ...nutrients[key], interpretation: 'low' } } };
+      assert.ok(scoreRotationChemistry('potato', low, field.cropHistory, NOW).score < known.score, key);
+    }
+    const unknown = { ...complete, nutrients: Object.fromEntries(Object.entries(nutrients).map(([key, item]) => [key, { ...item, interpretation: 'unknown' }])) };
+    assert.equal(scoreRotationChemistry('potato', unknown, field.cropHistory, NOW).score, null);
+    const before = JSON.stringify(complete);
+    scoreRotationChemistry('soybean', complete, field.cropHistory, NOW);
+    assert.equal(JSON.stringify(complete), before);
+  });
+  it('uses three-crop demand pressure only as a qualitative penalty when a lab confirms low supply', () => {
+    const highDemand = [{ id: 'a', cropId: 'potato', plantedOn: '2026-10-01' }, { id: 'b', cropId: 'potato', plantedOn: '2026-09-01' }, { id: 'c', cropId: 'potato', plantedOn: '2026-08-01' }];
+    const single = scoreRotationChemistry('potato', sample, highDemand.slice(0, 1), NOW);
+    const repeated = scoreRotationChemistry('potato', sample, highDemand, NOW);
+    assert.ok(repeated.score < single.score);
+    assert.equal(scoreRotationChemistry('potato', undefined, highDemand, NOW).score, null);
+    assert.equal(scoreRotationChemistry('potato', { ...sample, sampledOn: '2020-01-01' }, highDemand, NOW).score, null);
+  });
+  it('handles missing evidence and impossible conditions without forcing three recommendations', () => {
+    const missing = generateRotationPlan({ field: { ...field, cropHistory: [] }, climate: null, now: NOW });
+    assert.equal(missing.steps.length, 0); assert.equal(missing.score, null); assert.equal(missing.confidence, 'Low');
+    const hostile = emptyClimate(); hostile.months.forEach(month => { month.temperature = 55; month.hotDays = 30; });
+    const impossible = generateRotationPlan({ field, climate: hostile, now: NOW });
+    assert.equal(impossible.steps.length, 0);
+  });
+});
+
+describe('Field management drafts', () => {
+  it('allows a catalog crop without a pre-existing history and reuses saved plantings', () => {
+    const empty = { ...field, cropHistory: [], management: undefined };
+    const draft = { ...initialInputDraft(empty).management, currentCrop: 'wheat', plantedOn: '2026-09-01' };
+    const prepared = prepareManagement(empty, draft, 'new-record', '2026-11-14');
+    assert.equal(prepared.management.currentCropId, 'new-record');
+    assert.deepEqual(prepared.cropHistory, [{ id: 'new-record', cropId: 'wheat', plantedOn: '2026-09-01' }]);
+    const saved = { ...empty, ...prepared };
+    const again = prepareManagement(saved, initialInputDraft(saved).management, 'unused-id', '2026-11-14');
+    assert.equal(again.cropHistory.length, 1);
+    assert.equal(again.management.currentCropId, 'new-record');
+  });
+  it('keeps previous records when changing current crop and requires a real planting date', () => {
+    const draft = { ...initialInputDraft(field).management, currentCrop: 'maize', plantedOn: '2026-10-01' };
+    const prepared = prepareManagement(field, draft, 'maize-record', '2026-11-14');
+    assert.equal(prepared.cropHistory.length, 2);
+    assert.equal(field.cropHistory.length, 1);
+    assert.equal(prepared.management.currentCropId, 'maize-record');
+    assert.throws(() => prepareManagement(field, { ...draft, plantedOn: '' }, 'id', '2026-11-14'));
+    assert.throws(() => prepareManagement(field, { ...draft, plantedOn: '2027-01-01' }, 'id', '2026-11-14'));
+    assert.throws(() => prepareManagement(field, { ...draft, plantedOn: '2026-02-30' }, 'id', '2026-11-14'));
+    const cleared = prepareManagement(field, { ...draft, currentCrop: '' }, 'id', '2026-11-14');
+    assert.equal(cleared.management.currentCropId, null);
+    assert.equal(cleared.cropHistory.length, 1);
+  });
+});
 
 describe('Climate evidence and coverage', () => {
   it('recovers a known linear trend without confusing it with a forecast', () => {

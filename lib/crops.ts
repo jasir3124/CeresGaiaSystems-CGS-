@@ -16,6 +16,15 @@ export function sortCropHistory(history: CropHistory): CropHistory {
   return [...history].sort((a, b) => (b.plantedOn ?? '').localeCompare(a.plantedOn ?? ''));
 }
 
+/** Shared by the planner and live history UI; future records are not past plantings. */
+export function getRotationHistory(history: CropHistory, today = new Date().toISOString().slice(0, 10)) {
+  const sorted = sortCropHistory(history);
+  return {
+    past: sorted.filter(record => !record.plantedOn || record.plantedOn <= today).slice(0, 3),
+    future: sorted.filter(record => record.plantedOn && record.plantedOn > today)
+  };
+}
+
 export function normalizeCropHistory(value: unknown): CropHistory | undefined {
   if (isCropHistory(value)) return sortCropHistory(value);
   if (Array.isArray(value) && value.length === 3 && value.every(id => CROPS.some(crop => crop.id === id))) {

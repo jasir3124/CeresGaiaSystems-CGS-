@@ -5,6 +5,7 @@ import { isCropHistory } from '@/lib/crops';
 import { isFieldManagement, isSoilTest, AGRONOMY_SOURCES } from '@/lib/agronomy';
 import { loadFieldClimate } from '@/lib/climate-service';
 import { loadRecentWater } from '@/lib/water-service';
+import { generateRotationPlan } from '@/lib/crop-rotation';
 import { generateRecommendations, type RecommendationField } from '@/lib/recommendations';
 import type { OverviewData, WeatherData } from '@/lib/types';
 
@@ -41,8 +42,9 @@ export async function POST(request: NextRequest) {
   const overview: OverviewData | null = results[2].status === 'fulfilled' ? results[2].value : null;
   const waterEstimate = results[3].status === 'fulfilled' ? results[3].value : null;
   const result = generateRecommendations({ field, climate: climate?.analysis ?? null, weather, overview, waterEstimate, targetMonth });
+  const rotation = generateRotationPlan({ field, climate: climate?.analysis ?? null, targetMonth });
   const errors = results.flatMap(r => r.status === 'rejected' ? [r.reason instanceof Error ? r.reason.message : 'External data unavailable.'] : []);
-  return NextResponse.json({ ...result, sources: [
+  return NextResponse.json({ ...result, rotation, sources: [
     ...(climate?.sources.map((url: string) => ({ label: 'NASA POWER climate history', url, retrievedAt: climate.retrievedAt })) ?? []),
     ...(weather ? [{ label: 'Meteomatics forecast', url: `/api/weather?${query}`, retrievedAt: weather.generatedAt }] : []),
     ...(overview ? [{ label: 'NASA regional observations', url: `/api/nasa/overview?${query}`, retrievedAt: new Date().toISOString() }] : []),
