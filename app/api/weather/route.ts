@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Valid latitude and longitude are required.' }, { status: 400 });
   }
 
+  // Credentials remain on the server; the browser only receives parsed forecast values.
   const user = process.env.METEOMATICS_USERNAME;
   const password = process.env.METEOMATICS_PASSWORD;
   if (!user || !password) {

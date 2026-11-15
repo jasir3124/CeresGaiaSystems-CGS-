@@ -4,6 +4,7 @@ async function files(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
   return (await Promise.all(entries.map(entry => entry.isDirectory() ? files(join(directory, entry.name)) : join(directory, entry.name)))).flat();
 }
+// Version the precache with this build so HTML and hashed assets are installed together.
 const build = (await readFile('.next/BUILD_ID', 'utf8')).trim();
 const assets = (await files('.next/static')).filter(path => /\.(js|css|woff2?)$/.test(path)).map(path => '/_next/static/' + path.replaceAll('\\', '/').split('/static/')[1]);
 const template = await readFile('scripts/service-worker.js', 'utf8');

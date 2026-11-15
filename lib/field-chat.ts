@@ -26,6 +26,7 @@ function validDate(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) &&
     Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
 }
+// Tool arguments may choose only bounded dates and supported parameters for this field.
 export function nasaHistoryUrl(point: [number, number], args: Record<string, unknown>, now = Date.now()) {
   const { start, end, parameters } = args;
   if (!validDate(start) || !validDate(end) || start > end || start < '1984-01-01' ||
@@ -75,6 +76,7 @@ Selected field (user-entered): ${JSON.stringify(options.field)}
 NASA observations (fresh retrieval or explicit error): ${JSON.stringify(options.observations)}
 Weather forecast (fresh retrieval or explicit error): ${JSON.stringify(options.forecast)}
 Crop reference catalog: ${JSON.stringify(options.cropCatalog)}`;
+  // Bound model/tool rounds so one question cannot trigger unlimited NASA lookups.
   let toolCalls = 0;
   for (let round = 0; round < 3; round++) {
     const response = await fetcher(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(options.model)}:generateContent`, {

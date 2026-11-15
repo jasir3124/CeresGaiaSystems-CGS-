@@ -17,6 +17,7 @@ import { BASE_STYLES, DATA_LAYERS, LAYER_IDS } from '@/lib/layers';
 import type { Coordinates, LayerId, LayerManifest, LayerStatus, MapStyleId, OverviewData, WeatherData } from '@/lib/types';
 import { useFields } from '@/lib/field-store';
 
+// Load the WebGL map only in the browser; offline mode keeps the field tools available.
 const MapCanvas = dynamic(() => import('./MapCanvas'), { ssr: false });
 const MAPTILER_KEY = process.env.NEXT_PUBLIC_MAPTILER_KEY || '';
 const HAS_MAP_KEY = MAPTILER_KEY.length > 5 && !MAPTILER_KEY.includes('your_');
@@ -219,6 +220,7 @@ export default function FieldShiftApp() {
     setFocus({ coords: field.point, nonce: Date.now() });
     setSavedFieldsOpen(false);
   };
+  // Updating a saved field preserves its ID and associated agronomy records.
   const persistSelection = (name: string) => {
     if (!selection) return;
     const matched = fields.find(f => f.id === activeFieldId);

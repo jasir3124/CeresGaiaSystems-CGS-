@@ -8,6 +8,7 @@ export default function ThemeToggle() {
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');
+    // A saved choice overrides system appearance and stays in sync across browser tabs.
     const sync = () => {
       let preference: string | null = null;
       try { preference = localStorage.getItem('cgs-theme'); } catch {}

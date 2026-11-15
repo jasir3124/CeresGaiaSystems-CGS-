@@ -25,6 +25,7 @@ export function getRotationHistory(history: CropHistory, today = new Date().toIS
   };
 }
 
+// Migrate older crop-ID arrays without inventing missing planting dates.
 export function normalizeCropHistory(value: unknown): CropHistory | undefined {
   if (isCropHistory(value)) return sortCropHistory(value);
   if (Array.isArray(value) && value.length === 3 && value.every(id => CROPS.some(crop => crop.id === id))) {

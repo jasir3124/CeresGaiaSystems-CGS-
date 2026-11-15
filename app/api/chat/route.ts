@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid chat request.' }, { status: 400 });
   }
+  // Gemini is separate from deterministic crop scoring and requires a server-side key.
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.startsWith('your_')) return NextResponse.json({ error: 'AI chat is not configured yet. Add GEMINI_API_KEY to .env.local and restart the server.', configured: false }, { status: 503 });
   const query = new URLSearchParams({ lat: String(input.field.point[1]), lng: String(input.field.point[0]) });
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     } catch { return { error: 'This data source is temporarily unavailable.' }; }
   }
   try {
+    // Ground the answer in this selected field and explicitly pass any source failures.
     const [observations, forecast] = await Promise.all([retrieve(nasaOverview, '/api/nasa/overview'), retrieve(weatherForecast, '/api/weather')]);
     const result = await answerFieldQuestion({ apiKey, model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite', ...input, observations, forecast, cropCatalog: CROPS });
     const sources = [...result.sources];

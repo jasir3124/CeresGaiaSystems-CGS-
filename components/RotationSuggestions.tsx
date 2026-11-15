@@ -6,6 +6,7 @@ import type { RotationPlan } from '@/lib/crop-rotation';
 const muted = 'text-[#657260] dark:text-[#afc2b5]';
 const names = { nitrogen: 'Nitrogen (N)', phosphorus: 'Phosphorus (P)', potassium: 'Potassium (K)', calcium: 'Calcium (Ca)', magnesium: 'Magnesium (Mg)', sulfur: 'Sulfur (S)', iron: 'Iron (Fe)', zinc: 'Zinc (Zn)', boron: 'Boron (B)' };
 export default function RotationSuggestions({ plan, field, loading }: { plan?: RotationPlan; field: SavedField; loading: boolean }) {
+  // Read history from saved fields even before the server finishes generating a new plan.
   const { past, future } = getRotationHistory(field.cropHistory ?? []);
   // Show live saved records immediately; never display a sequence generated for different history.
   if (plan && (plan.history.length !== past.length || plan.history.some((record, index) => record.id !== past[index].id || record.cropId !== past[index].cropId || record.plantedOn !== past[index].plantedOn))) plan = undefined;

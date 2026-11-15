@@ -32,6 +32,7 @@ export function scoreRotationChemistry(cropId: CropId, soil: SoilTest | undefine
   let weighted = 0, known = 0;
   const reasons: string[] = [], cautions: string[] = [];
   const totalWeight = NUTRIENTS.reduce((sum, key) => sum + (NPK.includes(key) ? 3 : profile.nutrientFocus.includes(key) ? 2 : 1), 0);
+  // Interpret lab categories against crop demand; do not simulate unmeasured nutrient depletion.
   for (const key of NUTRIENTS) {
     const measurement = soil.nutrients[key];
     if (!measurement || measurement.interpretation === 'unknown') continue;
@@ -107,6 +108,7 @@ export function generateRotationPlan(input: { field: RecommendationField; climat
   const latest = history[0];
   const available = latest?.plantedOn ? Math.max(now, Date.parse(latest.plantedOn) + getCrop(latest.cropId).growingPeriodDays.max * DAY) : now;
   const solutions: { steps: RotationStep[]; score: number }[] = [];
+  // Search full sequences so a strong first crop cannot hide poor later transitions.
   function visit(steps: RotationStep[], preceding: CropRecord[], earliest: number) {
     if (steps.length === 3) {
       result.evaluatedSequences++;
@@ -149,6 +151,7 @@ export function generateRotationPlan(input: { field: RecommendationField; climat
     if (!advanced && steps.length) solutions.push({ steps, score: steps.reduce((sum, step) => sum + step.score, 0) / steps.length });
   }
   visit([], history, available);
+  // Prefer complete plans, then compare their weighted scores with deterministic ties.
   solutions.sort((a, b) => b.steps.length - a.steps.length || b.score - a.score || a.steps.map(step => step.cropId).join(',').localeCompare(b.steps.map(step => step.cropId).join(',')));
   const best = solutions[0];
   if (best) {

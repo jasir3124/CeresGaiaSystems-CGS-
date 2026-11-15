@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
     if (!response.ok || json.configured === false) throw new Error(json.error || json.message || 'Data source unavailable.');
     return json;
   }
+  // Independent sources can fail separately; known evidence still produces a partial report.
   const results = await Promise.allSettled([
     loadFieldClimate(field.point), retrieve(weatherForecast, '/api/weather'),
     retrieve(nasaOverview, '/api/nasa/overview'), loadRecentWater(field.point)
@@ -42,6 +43,7 @@ export async function POST(request: NextRequest) {
   const overview: OverviewData | null = results[2].status === 'fulfilled' ? results[2].value : null;
   const waterEstimate = results[3].status === 'fulfilled' ? results[3].value : null;
   const result = generateRecommendations({ field, climate: climate?.analysis ?? null, weather, overview, waterEstimate, targetMonth });
+  // Search rotations using the same downloaded evidence, without extra API requests.
   const rotation = generateRotationPlan({ field, climate: climate?.analysis ?? null, targetMonth });
   const errors = results.flatMap(r => r.status === 'rejected' ? [r.reason instanceof Error ? r.reason.message : 'External data unavailable.'] : []);
   return NextResponse.json({ ...result, rotation, sources: [

@@ -31,6 +31,7 @@ export default function Recommendations({ open, onClose }: { open: boolean; onCl
   const field = fields.find(f => f.id === (planningFieldId ?? activeFieldId)) ?? fields[0];
   const requestField = useMemo(() => field ? { id: field.id, name: field.name, point: field.point, radius: field.radius, cropHistory: field.cropHistory ?? [], soilTests: field.soilTests ?? [], management: field.management } : null,
     [field?.id, field?.name, field?.point, field?.radius, field?.cropHistory, field?.soilTests, field?.management]);
+  // Cache by saved inputs and scoring version; unsaved form drafts must not change results.
   const fingerprint = JSON.stringify({ policyVersion: AGRONOMY_VERSION, field: requestField, targetMonth: targetMonth ? Number(targetMonth) : undefined });
   const report = reports[fingerprint];
   // Optional inputs improve the evidence but are not prerequisites for suggestions.
@@ -48,6 +49,7 @@ export default function Recommendations({ open, onClose }: { open: boolean; onCl
   }, [open]);
   useEffect(() => {
     if (!open || !hydrated || !requestField) return;
+    // Offline reports must match the current field inputs, not just the field name.
     if (!online || !navigator.onLine) {
       let active = true;
       setLoading(true); setError(null);

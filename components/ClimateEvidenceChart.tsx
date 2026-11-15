@@ -16,6 +16,7 @@ export default function ClimateEvidenceChart({ climate }: { climate: ClimateAnal
   const firstYear = rows[0]?.year ?? 0, lastYear = rows.at(-1)?.year ?? firstYear;
   const averageYear = mean(valid.map(row => row.year)) ?? 0;
   const average = mean(valid.map(row => row[metric])) ?? 0;
+  // Draw the fitted historical trend around the observed mean, without projecting future years.
   const trendAt = (year: number) => average + (year - averageYear) * (trend ?? 0) / 10;
   const values = valid.map(row => row[metric]!);
   if (trend !== null && valid.length) values.push(trendAt(valid[0].year), trendAt(valid.at(-1)!.year));

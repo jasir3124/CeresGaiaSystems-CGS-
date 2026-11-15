@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
   const names = ['west', 'south', 'east', 'north'] as const;
   const vals = names.map(name => Number(p.get(name)));
   const [west, south, east, north] = vals;
+  // Restrict layers, dates and image bounds before sending a request to NASA.
   const validDate = Boolean(date && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= new Date().toISOString().slice(0, 10));
   if (!id || !Object.prototype.hasOwnProperty.call(DATA_LAYERS, id) || !validDate ||
       names.some(name => !p.has(name)) || vals.some(x => !Number.isFinite(x)) ||

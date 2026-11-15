@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+// Browser installation metadata; offline caching is handled separately by the service worker.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/', name: 'CeresGaiaSystems', short_name: 'CGS',

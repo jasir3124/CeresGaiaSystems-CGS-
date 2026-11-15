@@ -33,6 +33,7 @@ export function resolveBasemap(styleId: MapStyleId, maptilerKey: string): string
   return `https://api.maptiler.com/maps/${styles[styleId]}/style.json?key=${key}`;
 }
 
+// GIBS imagery is a dated visualization, separate from the numeric POWER observations.
 export const DATA_LAYERS: Record<LayerId, { label: string; nasaId: string; details: string; opacity: number; kind: string }> = {
   rain: { label: 'Rainfall', nasaId: 'IMERG_Precipitation_Rate', details: 'GPM IMERG · satellite rainfall rate', opacity: .76, kind: 'Satellite' },
   soil: { label: 'Soil moisture', nasaId: 'SMAP_L3_Passive_Enhanced_Night_Soil_Moisture', details: 'SMAP · satellite soil moisture (~9 km)', opacity: .70, kind: 'Satellite' },

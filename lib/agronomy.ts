@@ -42,6 +42,7 @@ export interface FieldManagement {
   irrigation: 'unknown' | 'rainfed' | 'irrigated';
   soilMoisture?: { measuredAt: string; volumetricPercent: number; refillBelowPercent?: number; source: string };
 }
+// Check dates, units and physical ranges before lab records can enter storage or scoring.
 export function isSoilTest(value: unknown): value is SoilTest {
   if (!value || typeof value !== 'object') return false;
   const t = value as SoilTest;

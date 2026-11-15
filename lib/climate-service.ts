@@ -2,6 +2,7 @@ import { unstable_cache } from 'next/cache';
 import { analyseClimate, parsePowerClimate } from './climate';
 
 export async function loadFieldClimate(point: [number, number]) {
+  // Use fifteen completed calendar years so a partial current year cannot bias trends.
   const endYear = new Date().getUTCFullYear() - 1;
   const chunks = [endYear - 14, endYear - 9, endYear - 4];
   // Cache successful chunks separately. A transient failed chunk can be retried

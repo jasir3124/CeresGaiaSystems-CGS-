@@ -35,6 +35,7 @@ type FieldsContextType = {
   deleteField: (id: string) => void;
 };
 
+// Field IDs keep crop history, management, lab tests and snapshots attached to one field.
 const STORAGE_KEY = 'fieldshift.fields.v1';
 const ACTIVE_KEY = 'fieldshift.active-field.v1';
 const FieldsContext = createContext<FieldsContextType | null>(null);
@@ -63,6 +64,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
         management: isFieldManagement(field.management) ? field.management : undefined
       })));
       setActiveFieldIdState(localStorage.getItem(ACTIVE_KEY));
+      // Crops and Suggestions share a selection, independently of the map viewport.
       setPlanningFieldId(localStorage.getItem(ACTIVE_KEY));
     } catch (error) { console.warn('Could not read saved fields', error); }
     setHydrated(true);
@@ -131,6 +133,7 @@ export function FieldsProvider({ children }: { children: React.ReactNode }) {
       setFields(next);
       return true;
     },
+    // Commit management and any newly recorded planting together in one storage write.
     saveFieldAgronomy: (id, soilTests, management, cropHistory) => {
       const existing = fields.find(field => field.id === id);
       const nextHistory = cropHistory ?? existing?.cropHistory ?? [];

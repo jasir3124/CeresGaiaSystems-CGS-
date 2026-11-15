@@ -4,6 +4,7 @@ import type { LayerManifest, LayerStatus } from '@/lib/types';
 
 export const runtime = 'nodejs';
 
+// Read advertised observation dates instead of assuming that imagery exists for today.
 function extractLayerDate(xml: string, name: string): string | null {
   const marker = `<Name>${name}</Name>`;
   const start = xml.indexOf(marker);

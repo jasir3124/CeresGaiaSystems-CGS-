@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Let browsers check for a new service worker instead of keeping an outdated script.
   async headers() {
     return [{ source: '/sw.js', headers: [
       { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },

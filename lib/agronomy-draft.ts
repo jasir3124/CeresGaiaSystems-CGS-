@@ -1,6 +1,7 @@
 import { isFieldManagement, type FieldManagement } from './agronomy';
 import { CROPS, isPlantingDate, type CropHistory } from './crops';
 import type { SavedField } from './field-store';
+// Unsaved form values are separate from persisted records and recommendation inputs.
 export type InputDraft = { management: Record<string, string>; soil: Record<string, string> };
 export function initialInputDraft(field: SavedField): InputDraft {
   const record = field.cropHistory?.find(record => record.id === field.management?.currentCropId);
@@ -20,6 +21,7 @@ export function prepareManagement(field: SavedField, draft: Record<string, strin
     const crop = CROPS.find(crop => crop.id === draft.currentCrop);
     if (!crop || !isPlantingDate(draft.plantedOn) || draft.plantedOn > today) throw new Error('Choose a crop and a valid planting date on or before today.');
     const current = cropHistory.find(record => record.id === field.management?.currentCropId && record.cropId === crop.id && record.plantedOn === draft.plantedOn);
+    // Reuse the same planting when saving again; changing crops must preserve older records.
     const matching = current ?? cropHistory.find(record => record.cropId === crop.id && record.plantedOn === draft.plantedOn);
     currentCropId = matching?.id ?? id;
     if (!matching) cropHistory.push({ id, cropId: crop.id, plantedOn: draft.plantedOn });

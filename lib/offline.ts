@@ -21,6 +21,7 @@ export async function readOffline<T>(key: string): Promise<T | null> {
     });
   } catch { return null; }
 }
+// Resolve only after IndexedDB commits the transaction, not just the individual request.
 export async function writeOffline(key: string, value: unknown): Promise<boolean> {
   try {
     const db = await database();
@@ -32,6 +33,7 @@ export async function writeOffline(key: string, value: unknown): Promise<boolean
     });
   } catch { return false; }
 }
+// Prefer current data online; fall back to a previously downloaded response when needed.
 export async function offlineJson<T>(url: string, signal?: AbortSignal): Promise<T> {
   if (navigator.onLine) {
     try {

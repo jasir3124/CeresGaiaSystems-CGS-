@@ -12,11 +12,13 @@ export async function loadRecentWater(point: [number, number]): Promise<WaterEst
     const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20000) });
     if (!response.ok) throw new Error(`NASA water estimate unavailable (HTTP ${response.status}).`);
     const data = parsePowerClimate(await response.json()).sort((a, b) => a.date.localeCompare(b.date));
+    // Estimate historical ET only from recent, complete temperature and rainfall records.
     const latest = data.filter(d => d.temperature !== null && d.minimum !== null && d.maximum !== null && d.rain !== null).at(-1);
     if (!latest || Date.now() - Date.parse(latest.date) > 14 * 86400000) throw new Error('NASA minimum/maximum temperatures are missing or older than 14 days.');
     const start = new Date(Date.parse(latest.date) - 6 * 86400000).toISOString().slice(0, 10);
     const days = data.filter(d => d.date >= start && d.date <= latest.date);
     if (days.length !== 7 || days.some(d => d.rain === null)) throw new Error('Incomplete seven-day weather record for evapotranspiration.');
+    // Total rainfall and reference ET are context, not an irrigation prescription.
     return { start, end: latest.date, days: days.length, etoMm: estimateReferenceEt(days, point[1]), rainMm: days.reduce((sum, d) => sum + d.rain!, 0), source: url, retrievedAt: new Date().toISOString() };
   }, ['cgs-water-v1', String(point[0]), String(point[1]), today], { revalidate: 21600 })();
 }

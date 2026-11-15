@@ -6,17 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="d4b9d913-cf75-4fc7-a7a3-7aa98a1c22bb" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/api/recommendations/route.ts" beforeDir="false" afterPath="$PROJECT_DIR$/app/api/recommendations/route.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/CropsModal.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/CropsModal.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/Recommendations.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/Recommendations.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/agronomy.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/agronomy.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/crops.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/crops.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/data/crop-agronomy.json" beforeDir="false" afterPath="$PROJECT_DIR$/lib/data/crop-agronomy.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/field-store.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/lib/field-store.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/lib/recommendations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/lib/recommendations.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/crops.test.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/tests/crops.test.mjs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/next-env.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/next-env.d.ts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/tests/pwa-browser.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/tests/pwa-browser.mjs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/recommendations.test.mjs" beforeDir="false" afterPath="$PROJECT_DIR$/tests/recommendations.test.mjs" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -105,7 +96,7 @@
       <workItem from="1794685706066" duration="448000" />
       <workItem from="1794692380575" duration="2855000" />
       <workItem from="1794735796860" duration="2257000" />
-      <workItem from="1794746779422" duration="678000" />
+      <workItem from="1794746779422" duration="1790000" />
     </task>
     <servers />
   </component>

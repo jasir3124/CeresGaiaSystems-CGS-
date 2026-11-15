@@ -34,6 +34,7 @@ export default function FieldDataDetails({ name, point, data, loading, error, on
     const controller = new AbortController();
     setHistory(null); setHistoryLoading(true); setHistoryError(null);
     const params = new URLSearchParams({ lng: String(lng), lat: String(lat), history: '1' });
+    // Persist opened history for offline viewing; coordinate-based keys keep locations separate.
     offlineJson<OverviewData>(`/api/nasa/overview?${params}`, controller.signal).then(result => {
       setHistory(result as OverviewData);
     }).catch(error => { if (!controller.signal.aborted) setHistoryError(error instanceof Error ? error.message : 'History unavailable'); })
@@ -56,6 +57,7 @@ export default function FieldDataDetails({ name, point, data, loading, error, on
   const rows = allRows.filter(row => new Date(`${row.date}T12:00:00Z`).getTime() >= cutoff);
   const rain = rows.filter(row => row.precipitation !== null);
   const total = rain.length ? rain.reduce((sum, row) => sum + row.precipitation!, 0) : null;
+  // Long periods use monthly totals, while short periods retain daily rainfall detail.
   const chartRows = days <= 30 ? rows : Array.from(rows.reduce((months, row) => {
     const key = row.date.slice(0, 7);
     const month = months.get(key) ?? { date: `${key}-01`, precipitation: null, temperature: null, soilWetness: null };

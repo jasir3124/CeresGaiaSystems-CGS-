@@ -14,6 +14,7 @@ export default function PwaControls() {
   const [installError, setInstallError] = useState<string | null>(null);
   const noticeRef = useRef<HTMLElement>(null);
   useEffect(() => {
+    // Register only production builds so cached assets do not interfere with development.
     if (process.env.NODE_ENV !== 'production' || !('serviceWorker' in navigator)) return;
     let active = true;
     const register = async () => {
@@ -27,6 +28,7 @@ export default function PwaControls() {
     return () => { active = false; };
   }, []);
   useEffect(() => {
+    // Keep the install event until the user chooses the app's Install button.
     const available = (event: Event) => { event.preventDefault(); setPrompt(event as InstallPrompt); };
     const installed = () => setPrompt(null);
     window.addEventListener('beforeinstallprompt', available);
@@ -53,6 +55,7 @@ export default function PwaControls() {
     } catch { setInstallError('Installation did not finish. Try again from your browser menu.'); }
     finally { setInstalling(false); }
   }
+  // Remember the optional dismissal on this device; saved offline data is unaffected.
   function dismiss() {
     if (never) { try { localStorage.setItem(DISMISS_KEY, 'true'); } catch {} }
     setNotice(false);

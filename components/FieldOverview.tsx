@@ -46,6 +46,7 @@ function Metric({ title, measurement, icon, tone, note, digits = 1 }: {
   </div>;
 }
 
+// Compact saved-field editor; longer history is opened in the separate data panel.
 export default function FieldOverview({ offline, selection, radius, onRadius, onClear, onClose, onSave, saved, initialName, onRefresh, data, loading, error, placeLabel, onViewMore }: Props) {
   const [fieldName, setFieldName] = useState(initialName);
   useEffect(() => setFieldName(initialName), [initialName]);

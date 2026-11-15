@@ -29,6 +29,7 @@ export interface RecommendationResult {
   forecastAt: string | null; forecastThrough: string | null; forecast: WeatherData | null; observations: OverviewData | null;
   waterEstimate: WaterEstimate | null;
 }
+// Explicit prototype weights make each crop score inspectable; these are not yield predictions.
 export const SCORE_POLICY = { climate: 20, adaptation: 10, soil: 15, nutrients: 15, rotation: 20, water: 10, season: 10 } as const;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const round = (n: number) => Math.round(n * 10) / 10;
@@ -61,6 +62,7 @@ export function generateRecommendations(input: {
   const orderedHistory = [...elapsedHistory]; // Unknown dates keep migrated newest-first order at the end.
   const previous = orderedHistory[0];
   const soil = latestSoil(field, now);
+  // Old chemistry remains visible as a record but is excluded from suitability scoring.
   const soilFresh = !!soil && now - Date.parse(soil.sampledOn) <= 3 * 365 * DAY;
   const validForecast = input.weather && now - Date.parse(input.weather.generatedAt) >= -3600000 && now - Date.parse(input.weather.generatedAt) <= 6 * 3600000;
   const weather = validForecast ? { ...input.weather!, forecast: input.weather!.forecast.filter(p => Date.parse(p.time) >= now - 3600000) } : null;
@@ -154,6 +156,7 @@ export function generateRecommendations(input: {
     const seasonScore = baseFit === null || frost === null || hot === null ? null : clamp(baseFit - (frostSensitive ? frost * 10 : 0) - (crop.optimumTemperatureC.max < 30 ? hot * 5 : hot * 2));
     if (frostSensitive && frost !== null && frost > 0.5) risks.push('Historical frost days occur within this candidate window; use local frost dates and soil temperature before planting.');
     add('season', 'Growing window and extremes', seasonScore, 'Start with temperature-fit score. Subtract 10 per average monthly frost day for frost-sensitive crops; subtract 5 per hot day for cool-optimum crops or 2 otherwise. Hot day ≥35 °C, frost day <0 °C. Winter/spring cultivar phenology is unknown.');
+    // Normalize over known evidence; partial soil/NPK coverage reduces its effective weight.
     const known = factors.filter(f => f.score !== null), weight = known.reduce((s, f) => s + f.weight * f.coverage, 0);
     const weighted = known.reduce((s, f) => s + f.score! * f.weight * f.coverage / 100, 0);
     const score = weight ? Math.round(weighted / weight * 100) : null;
@@ -216,6 +219,7 @@ function currentAdvice(field: RecommendationField, weather: WeatherData | null, 
     harvestNote: 'Broad planting-date plus species-cycle range, not a predicted harvest date. Confirm cultivar, maturity, growing-degree requirements, crop inspection and forecast before harvesting.', irrigation, warnings, management };
 }
 
+// Hargreaves-Samani reference ET uses temperature range and latitude-derived solar geometry.
 export function estimateReferenceEt(days: { date: string; temperature: number | null; minimum: number | null; maximum: number | null; rain: number | null }[], latitude: number) {
   let eto = 0;
   if (!days.length || days.some(d => d.temperature === null || d.minimum === null || d.maximum === null || d.maximum! < d.minimum!)) return null;

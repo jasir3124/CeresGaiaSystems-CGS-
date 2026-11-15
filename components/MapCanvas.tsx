@@ -26,6 +26,7 @@ export default function MapCanvas({ maptilerKey, selection, radius, styleId, ena
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
+  // Refs keep map event handlers current without rebuilding the WebGL map on every render.
   const onSelectRef = useRef(onSelect);
   const onReadyRef = useRef(onReady);
   const [styleVersion, setStyleVersion] = useState(0);

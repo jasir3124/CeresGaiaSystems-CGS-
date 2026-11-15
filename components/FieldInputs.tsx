@@ -11,6 +11,7 @@ const button = 'rounded-xl bg-[#286048] px-4 py-2 text-sm font-semibold text-whi
 export default function FieldInputs({ field, draft, onDraft }: { field: SavedField; draft: InputDraft; onDraft: (draft: InputDraft) => void }) {
   const { saveFieldAgronomy } = useFields();
   const [message, setMessage] = useState<{ error: boolean; text: string } | null>(null);
+  // Controlled drafts live in the parent so Refresh and field switches do not erase edits.
   const bind = (group: keyof InputDraft, name: string, fallback = '') => ({ name, value: draft[group][name] ?? fallback, onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => onDraft({ ...draft, [group]: { ...draft[group], [name]: event.target.value } }) });
   const today = new Date().toISOString().slice(0, 10);
   function feedback(saved: boolean) { setMessage({ error: !saved, text: saved ? 'Field details saved. Suggestions update automatically; no Refresh needed.' : 'Could not save. Check all measurements, dates, and browser storage.' }); }
@@ -43,6 +44,7 @@ export default function FieldInputs({ field, draft, onDraft }: { field: SavedFie
       const test: SoilTest = { id: crypto.randomUUID(), sampledOn: String(form.get('sampledOn')), source: String(form.get('source')), method: String(form.get('method')), depthCm: Number(form.get('depthCm')), nutrients: {} };
       for (const key of ['ph', 'organicMatterPercent', 'salinityEce'] as const) if (form.get(key) !== '') test[key] = Number(form.get(key));
       for (const key of NUTRIENTS) if (form.get(key) !== '') test.nutrients[key] = { value: Number(form.get(key)), unit: 'mg/kg', interpretation: String(form.get(`${key}-rating`)) as 'unknown' };
+      // Saving one soil test must preserve the field's current crop and management settings.
       const saved = isSoilTest(test) && saveFieldAgronomy(field.id, [test, ...(field.soilTests ?? [])], field.management ?? { currentCropId: null, irrigation: 'unknown' });
       feedback(saved); if (saved) onDraft({ ...draft, soil: {} });
     }}>

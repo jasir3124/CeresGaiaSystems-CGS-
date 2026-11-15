@@ -29,6 +29,7 @@ export default function FieldChat({ open, field, fields, activeFieldId, onSelect
   useEffect(() => { if (open) bottom.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [messages, loading, open]);
   useEffect(() => { if (open) input.current?.focus(); }, [open]);
 
+  // Send only bounded conversation history and the selected field context to the server.
   async function ask(text: string) {
     if (!online || !field || loading || !text.trim()) return;
     const next: DisplayMessage[] = [...messages, { role: 'user', content: text.trim() }];

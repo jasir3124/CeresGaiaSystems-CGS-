@@ -2,6 +2,7 @@ export type Coordinates = [number, number]; // [longitude, latitude]
 export type MapStyleId = 'satellite' | 'streets' | 'terrain' | 'dark';
 export type LayerId = 'rain' | 'soil' | 'vegetation' | 'temperature' | 'wind';
 
+// Null means unavailable; each measurement keeps its original date and unit.
 export interface Measurement { value: number | null; date: string | null; unit: string; }
 export interface DailyRow { date: string; precipitation: number | null; soilWetness: number | null; temperature: number | null; }
 export interface OverviewData {

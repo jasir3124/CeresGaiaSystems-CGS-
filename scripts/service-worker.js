@@ -19,6 +19,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   // Never download or cache external map tiles, imagery, or third-party requests.
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  // A cached app shell lets installed users reopen the dashboard without a network.
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
       try { return await fetch(request); }

@@ -11,6 +11,7 @@ const formatDate = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateSt
 const selectClass = 'mt-2 w-full rounded-xl border border-[#dbe6da] dark:border-[#364b40] bg-white dark:bg-[#18271f] px-3 py-2.5 text-sm text-[#2b5038] dark:text-[#e2ece5] outline-none focus:border-[#397c58] focus:ring-2 focus:ring-[#397c58]/20';
 
 export default function CropsModal({ onClose }: { onClose: () => void }) {
+  // Share the planning field with Suggestions; each field keeps its own unfinished crop entry.
   const { fields, activeFieldId, planningFieldId, setPlanningFieldId, hydrated, saveFieldCrops } = useFields();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [messages, setMessages] = useState<Record<string, { text: string; error: boolean }>>({});

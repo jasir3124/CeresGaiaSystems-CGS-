@@ -21,6 +21,7 @@ export const metadata: Metadata = {
   description: "CGS (CeresGaiaSystems) helps you explore fields, crops, weather, and NASA Earth observation data. No sign-in required."
 };
 
+// Apply the saved theme before paint, then share saved fields across the dashboard.
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('cgs-theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches))}catch{document.documentElement.classList.toggle('dark',matchMedia('(prefers-color-scheme: dark)').matches)}` }}/></head><body><FieldsProvider>{children}</FieldsProvider></body></html>;
 }

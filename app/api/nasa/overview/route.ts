@@ -12,6 +12,7 @@ type PowerResponse = {
 
 function ymd(day: Date) { return day.toISOString().slice(0, 10).replaceAll('-', ''); }
 function readable(key: string) { return `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 8)}`; }
+// NASA fill values are missing data; real zero readings must remain valid.
 function valid(value: unknown): value is number { return typeof value === 'number' && Number.isFinite(value) && value > -900; }
 
 async function loadPower(latitude: number, longitude: number, start: string, end: string, community: string, parameters: string[]) {
@@ -40,6 +41,7 @@ function latest(data: Record<string, Record<string, number>>, key: string, unit:
 function numberOrNull(series: Record<string, number> | undefined, date: string) {
   const v = series?.[date]; return valid(v) ? v : null;
 }
+// Both sources are fractions; the UI label distinguishes wetness from volumetric moisture.
 function latestSoil(data: Record<string, Record<string, number>>, key: string): Measurement {
   const dates = Object.keys(data[key] ?? {}).sort().reverse();
   for (const date of dates) {
@@ -126,6 +128,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
+    // Align series by UTC date without filling missing measurements.
     const allKeys = Array.from(new Set([...Object.keys(ag.T2M ?? {}), ...Object.keys(ag.PRECTOTCORR ?? {}), ...Object.keys(hy[soilSource ?? 'GWETTOP'] ?? {})])).sort().slice(history ? -365 : -30);
     const daily: DailyRow[] = allKeys.map(date => ({
       date: readable(date),

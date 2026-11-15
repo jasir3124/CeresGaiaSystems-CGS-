@@ -21,6 +21,7 @@ export const mean = (values: (number | null)[]) => {
   const valid = values.filter((v): v is number => v !== null && Number.isFinite(v));
   return valid.length ? valid.reduce((sum, v) => sum + v, 0) / valid.length : null;
 };
+// Least-squares historical trend; require ten valid years and report change per decade.
 export function slopePerDecade(points: { year: number; value: number | null }[]) {
   const valid = points.filter((p): p is { year: number; value: number } => p.value !== null && Number.isFinite(p.value));
   if (valid.length < 10 || Math.max(...valid.map(p => p.year)) - Math.min(...valid.map(p => p.year)) < 9) return null;
@@ -28,6 +29,7 @@ export function slopePerDecade(points: { year: number; value: number | null }[])
   const denominator = valid.reduce((sum, p) => sum + (p.year - x) ** 2, 0);
   return denominator ? valid.reduce((sum, p) => sum + (p.year - x) * (p.value - y), 0) / denominator * 10 : null;
 }
+// Sparse periods stay unknown; daily coverage must reach 90% for each metric.
 function aggregate(rows: ClimateDay[], expected: number) {
   const enough = (key: keyof ClimateDay) => rows.filter(r => typeof r[key] === 'number').length >= Math.ceil(expected * 0.9);
   const average = (key: Exclude<keyof ClimateDay, 'date'>) => enough(key) ? mean(rows.map(r => r[key])) : null;
@@ -80,6 +82,7 @@ export function analyseClimate(input: ClimateDay[], firstYear: number, lastYear:
     yearsUsable: annual.filter(r => r.temperature !== null && r.rain !== null).length, months, annual,
     trends: { temperaturePerDecade: trend('temperature'), rainPerDecade: trend('rain'), solarPerDecade: trend('solar'), hotDaysPerDecade: trend('hotDays'), frostDaysPerDecade: trend('frostDays'), drySpellDaysPerDecade: trend('longestDrySpell') } };
 }
+// Join NASA parameter series by date and turn fill values into explicit gaps.
 export function parsePowerClimate(raw: unknown): ClimateDay[] {
   const json = raw as { properties?: { parameter?: Record<string, Record<string, number>> } };
   const series = json?.properties?.parameter;
